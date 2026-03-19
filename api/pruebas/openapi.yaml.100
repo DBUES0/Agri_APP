@@ -1,0 +1,311 @@
+openapi: 3.0.0
+info:
+  title: API Agri
+  version: v1
+  description: API para la gestión de datos agrícolas.
+servers:
+  - url: https://api.bueso.duckdns.org # Reemplaza con la URL base de tu API
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+    Gasto:
+      type: object
+      properties:
+        kfincagastos:
+          type: string
+          format: uuid
+        kagricultor:
+          type: string
+          format: uuid
+        fecha_dtm:
+          type: string
+          format: date-time
+        importe_flt:
+          type: number
+          format: float
+        concepto_str:
+          type: string
+        campo4:
+          type: string
+        # ... (añade otros campos de tblFincaGastos si es necesario)
+    NewGasto:
+      type: object
+      properties:
+        kagricultor:
+          type: string
+          format: uuid
+        importe:
+          type: number
+          format: float
+        concepto:
+          type: string
+        campo4:
+          type: string
+    FileUploadResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+        uuid:
+          type: string
+          format: uuid
+paths:
+  /api/login:
+    post:
+      summary: Autenticar usuario y obtener token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Datos de inicio de sesión incompletos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/gastos/{id}:
+    get:
+      summary: Obtener gastos de un agricultor por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del agricultor
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de gastos del agricultor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Gasto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos:
+    post:
+      summary: Insertar un nuevo gasto
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGasto'
+      responses:
+        '200':
+          description: Gasto insertado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+        '400':
+          description: Faltan datos en la solicitud
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/archivo:
+    post:
+      summary: Subir un nuevo archivo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                  description: Archivo a subir
+                kuuid:
+                  type: string
+                  format: uuid
+                  description: UUID relacionado al archivo (kfincagasto, kalbaran, kagricultor)
+                tipo:
+                  type: string
+                  description: Tipo de archivo
+              required:
+                - archivo
+                - kuuid
+                - tipo
+      responses:
+        '200':
+          description: Archivo subido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '400':
+          description: No se proporcionó archivo o faltan parámetros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos/descargararchivo/{id}:
+    get:
+      summary: Descargar archivo por ID desde la base de datos
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del archivo en la base de datos (karchivos)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Archivo descargado exitosamente
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+              description: Tipo MIME del archivo
+            Content-Disposition:
+              schema:
+                type: string
+              description: Indica que la respuesta es un archivo adjunto y sugiere un nombre de archivo
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+              description: Tamaño del archivo en bytes
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Archivo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos/descargararchivonas/{id}:
+    get:
+      summary: Descargar archivo desde el servidor por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del archivo en la base de datos (karchivos)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Archivo descargado exitosamente
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+              description: Tipo MIME del archivo
+            Content-Disposition:
+              schema:
+                type: string
+              description: Indica que la respuesta es un archivo adjunto y sugiere un nombre de archivo
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+              description: Tamaño del archivo en bytes
+            X-Content-Type-Options:
+              schema:
+                type: string
+              description: Protege contra la detección de tipo MIME
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Ruta de archivo no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Archivo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'

@@ -1,0 +1,81 @@
+<?php
+require 'vendor/autoload.php';
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\Factory\AppFactory;
+
+$app = AppFactory::create();
+
+// Configuraci  n de la base de datos
+$servername = "192.168.1.226";
+$username = "agricultura";
+$password = "Finca2025";
+$dbname = "agri";
+
+// Ruta para obtener los gastos de un agricultor
+$app->get('/api/gastos/{id}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
+    $id = $args['id'];
+    
+    $conn = new mysqli($servername, $username, $password, $dbname);
+    if ($conn->connect_error) {
+        $response->getBody()->write(json_encode(["error" => "Conexi  n fallida: " . $conn->connect_error]));
+        return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
+    }
+
+    // Uso de sentencia preparada para evitar inyecci  n SQL
+    $stmt = $conn->prepare("SELECT * FROM tblFincaGastos WHERE kagricultor = ?");
+    $stmt->bind_param("s", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $gastos = $result->fetch_all(MYSQLI_ASSOC);
+    
+    $stmt->close();
+    $conn->close();
+
+    $response->getBody()->write(json_encode($gastos));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
+$app->post('/api/gastos/upload', function (Request $request, Response $response) use ($servername, $username, $password, $dbname) {
+    $uploadedFiles = $request->getUploadedFiles();
+
+    // Verificar si se recibió un archivo
+    if (empty($uploadedFiles['archivo'])) {
+        return $response->withStatus(400)->withHeader('Content-Type', 'text/plain')->write("No se recibió ningún archivo.");
+    }
+
+    $archivo = $uploadedFiles['archivo'];
+    
+    // Verificar si hubo error en la subida
+    if ($archivo->getError() !== UPLOAD_ERR_OK) {
+        return $response->withStatus(500)->withHeader('Content-Type', 'text/plain')->write("Error al subir el archivo.");
+    }
+
+    // Definir la ruta donde se guardará el archivo
+    $directorio = __DIR__ . "/uploads/";
+    if (!is_dir($directorio)) {
+        mkdir($directorio, 0777, true);
+    }
+    $rutaArchivo = $directorio . $archivo->getClientFilename();
+
+    // Mover el archivo al servidor
+    $archivo->moveTo($rutaArchivo);
+
+    // Guardar la ruta en la base de datos
+    $conn = new mysqli($servername, $username, $password, $dbname);
+    if ($conn->connect_error) {
+        return $response->withStatus(500)->withHeader('Content-Type', 'text/plain')->write("Conexión fallida: " . $conn->connect_error);
+    }
+
+    $sql = "INSERT INTO tblFincaGastos (archivo) VALUES ('$rutaArchivo')";
+    if ($conn->query($sql) === TRUE) {
+        return $response->withHeader('Content-Type', 'text/plain')->write("Archivo subido y guardado correctamente.");
+    } else {
+        return $response->withStatus(500)->withHeader('Content-Type', 'text/plain')->write("Error: " . $conn->error);
+    }
+});
+
+$app->run();
+?>

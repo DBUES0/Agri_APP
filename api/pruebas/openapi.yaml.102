@@ -1,0 +1,555 @@
+openapi: 3.0.0
+info:
+  title: API Agri
+  version: v1
+  description: API para la gestión de datos agrícolas.
+servers:
+  - url: https://api.bueso.duckdns.org # Reemplaza con la URL base de tu API
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+    Gasto:
+      type: object
+      properties:
+        kfincagastos:
+          type: string
+          format: uuid
+        kagricultor:
+          type: string
+          format: uuid
+        fecha_dtm:
+          type: string
+          format: date-time
+        importe_flt:
+          type: number
+          format: float
+        concepto_str:
+          type: string
+        campo4:
+          type: string
+        # ... (añade otros campos de tblFincaGastos si es necesario)
+    NewGasto:
+      type: object
+      properties:
+        kagricultor:
+          type: string
+          format: uuid
+        importe:
+          type: number
+          format: float
+        concepto:
+          type: string
+        campo4:
+          type: string
+    FileUploadResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+        uuid:
+          type: string
+          format: uuid
+    AlbaranCabecera:
+      type: object
+      properties:
+        kalbaran:
+          type: string
+          format: uuid
+        kagricultor:
+          type: string
+          format: uuid
+        fecha_dtm:
+          type: string
+          format: date-time
+        kalmacen:
+          type: string
+          format: uuid
+          nullable: true
+        ktipodeprecio:
+          type: string
+          nullable: true
+        comentario_str:
+          type: string
+          nullable: true
+
+    NewAlbaranCabecera:
+      type: object
+      properties:
+        kagricultor:
+          type: string
+          format: uuid
+          description: ID del agricultor asociado
+        kfecha:
+          type: string
+          format: date
+          description: Fecha del albarán (YYYY-MM-DD)
+          nullable: true
+        kalmacen:
+          type: string
+          format: uuid
+          description: ID del almacén
+          nullable: true
+        ktipoprecio:
+          type: string
+          description: Tipo de precio aplicado
+          nullable: true
+        kcomentario:
+          type: string
+          description: Comentarios sobre el albarán
+          nullable: true
+      required:
+        - kagricultor
+    AlbaranDetalle:
+      type: object
+      properties:
+        kalbarandetalle:
+          type: string
+          format: uuid
+          description: ID único del detalle
+        kalbaran:
+          type: string
+          format: uuid
+          description: ID del albarán asociado
+        linea_int:
+          type: integer
+          description: Número de línea (autogenerado por trigger)
+        kg_float:
+          type: number
+          format: float
+          description: Kilogramos del producto
+        numeropallets_int:
+          type: integer
+          nullable: true
+          description: Número de pallets
+        numerocajas_int:
+          type: integer
+          nullable: true
+          description: Número de cajas
+        precio_flt:
+          type: number
+          format: float
+          nullable: true
+          description: Precio unitario
+        kproductos:
+          type: string
+          format: uuid
+          description: ID del producto
+        comentario_str:
+          type: string
+          nullable: true
+          description: Comentarios adicionales
+
+    NewAlbaranDetalle:
+      type: object
+      properties:
+        kalbaran:
+          type: string
+          format: uuid
+          description: ID del albarán asociado
+        kg_float:
+          type: number
+          format: float
+          description: Kilogramos del producto
+        numeropallets_int:
+          type: integer
+          nullable: true
+          description: Número de pallets
+        numerocajas_int:
+          type: integer
+          nullable: true
+          description: Número de cajas
+        precio_flt:
+          type: number
+          format: float
+          nullable: true
+          description: Precio unitario
+        kproductos:
+          type: string
+          format: uuid
+          description: ID del producto
+        comentario_str:
+          type: string
+          nullable: true
+          description: Comentarios adicionales
+      required:
+        - kalbaran
+        - kg_float
+        - kproductos
+        
+paths:
+  /api/login:
+    post:
+      summary: Autenticar usuario y obtener token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Autenticación exitosa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Datos de inicio de sesión incompletos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/gastos/{id}:
+    get:
+      summary: Obtener gastos de un agricultor por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del agricultor
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de gastos del agricultor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Gasto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos:
+    post:
+      summary: Insertar un nuevo gasto
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGasto'
+      responses:
+        '200':
+          description: Gasto insertado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+        '400':
+          description: Faltan datos en la solicitud
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/albarancabecera:
+    post:
+      summary: Crear una nueva cabecera de albarán
+      description: Crea un nuevo registro de cabecera de albarán en el sistema
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewAlbaranCabecera'
+      responses:
+        '201':
+          description: Cabecera de albarán creada exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Cabecera de albarán creada correctamente"
+                  kalbaran:
+                    type: string
+                    format: uuid
+                    description: ID del nuevo albarán creado
+        '400':
+          description: Faltan datos obligatorios o formato inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError' 
+  /api/albarandetalles:
+    post:
+      tags:
+        - Albaranes
+      summary: Añadir un detalle a un albarán
+      description: Crea un nuevo registro de detalle de albarán. El número de línea se genera automáticamente.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewAlbaranDetalle'
+      responses:
+        '201':
+          description: Detalle de albarán creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Detalle de albarán creado correctamente"
+                  detalle:
+                    $ref: '#/components/schemas/AlbaranDetalle'
+        '400':
+          description: Faltan datos obligatorios o formato inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/albarandetalles/{kalbaran}:
+    get:
+      tags:
+        - Albaranes
+      summary: Obtener detalles de un albarán
+      description: Retorna todos los detalles (líneas) de un albarán específico, ordenados por número de línea
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kalbaran
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID del albarán
+      responses:
+        '200':
+          description: Lista de detalles del albarán
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlbaranDetalle'
+        '404':
+          description: No se encontraron detalles para el albarán especificado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/archivo:
+    post:
+      tags:
+        - Archivos    
+      summary: Subir un nuevo archivo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                  description: Archivo a subir
+                kuuid:
+                  type: string
+                  format: uuid
+                  description: UUID relacionado al archivo (kfincagasto, kalbaran, kagricultor)
+                tipo:
+                  type: string
+                  description: Tipo de archivo
+              required:
+                - archivo
+                - kuuid
+                - tipo
+      responses:
+        '200':
+          description: Archivo subido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResponse'
+        '400':
+          description: No se proporcionó archivo o faltan parámetros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos/descargararchivo/{id}:
+    get:
+      tags:
+        - Archivos
+      summary: Descargar archivo por ID desde la base de datos
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del archivo en la base de datos (karchivos)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Archivo descargado exitosamente
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+              description: Tipo MIME del archivo
+            Content-Disposition:
+              schema:
+                type: string
+              description: Indica que la respuesta es un archivo adjunto y sugiere un nombre de archivo
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+              description: Tamaño del archivo en bytes
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Archivo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/gastos/descargararchivonas/{id}:
+    get:
+      tags:
+        - Archivos
+      summary: Descargar archivo desde el servidor por ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID del archivo en la base de datos (karchivos)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Archivo descargado exitosamente
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+              description: Tipo MIME del archivo
+            Content-Disposition:
+              schema:
+                type: string
+              description: Indica que la respuesta es un archivo adjunto y sugiere un nombre de archivo
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+              description: Tamaño del archivo en bytes
+            X-Content-Type-Options:
+              schema:
+                type: string
+              description: Protege contra la detección de tipo MIME
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Ruta de archivo no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Archivo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalServerError'

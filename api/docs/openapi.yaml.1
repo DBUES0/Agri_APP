@@ -1,0 +1,62 @@
+openapi: 3.0.0
+info:
+  title: API Agricultura
+  version: 1.0.0
+paths:
+  /api/gastos/{id}:
+    get:
+      summary: Obtener gastos de un agricultor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de gastos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+  /api/gastos:
+    post:
+      summary: Insertar nuevo gasto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kagricultor:
+                  type: string
+                importe:
+                  type: number
+                concepto:
+                  type: string
+                campo4:
+                  type: string
+      responses:
+        '200':
+          description: Gasto insertado
+  /api/gastos/archivo:
+    post:
+      summary: Subir archivo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                kfincagastos:
+                  type: string
+      responses:
+        '200':
+          description: Archivo subido correctamente

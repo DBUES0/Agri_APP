@@ -1,0 +1,48 @@
+<?php
+require 'vendor/autoload.php';
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Slim\Factory\AppFactory;
+
+$app = AppFactory::create();
+
+// Configuración de la base de datos
+$servername = "192.168.1.226";
+$username = "agricultura";
+$password = "Finca2025";
+$dbname = "agri";
+
+// Ruta para obtener los gastos de un agricultor
+$app->get('/api/gastos/{id}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
+    $id = $args['id'];
+
+    // Crear conexión
+    $conn = new mysqli($servername, $username, $password, $dbname);
+
+    // Verificar conexión
+    if ($conn->connect_error) {
+        $response->getBody()->write("Conexión fallida: " . $conn->connect_error);
+        return $response->withStatus(500);
+    }
+
+    // Realizar la consulta
+    $sql = "SELECT * FROM tblFincaGastos WHERE kagricultor = '$id'";
+    $result = $conn->query($sql);
+
+    if ($result->num_rows > 0) {
+        $gastos = [];
+        while($row = $result->fetch_assoc()) {
+            $gastos[] = $row;
+        }
+        $response->getBody()->write(json_encode($gastos));
+    } else {
+        $response->getBody()->write("No se encontraron registros.");
+    }
+
+    $conn->close();
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
+$app->run();
+?>
