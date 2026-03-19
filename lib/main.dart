@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import '../pages/page_login.dart';
+import 'utils/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +15,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Agri App',
-      theme: ThemeData(primarySwatch: Colors.green),
+      //theme: ThemeData(primarySwatch: Colors.green),
+      theme: AppTheme.lightTheme,
       home: const LoginPage(),
       debugShowCheckedModeBanner: false,
     );
