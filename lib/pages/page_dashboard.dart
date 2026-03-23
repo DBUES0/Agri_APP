@@ -1,5 +1,5 @@
-import 'package:AgriAPP/pages/page_usuario.dart';
-import 'package:AgriAPP/utils/ui_utils.dart';
+import 'package:agriapp/pages/page_usuario.dart';
+import 'package:agriapp/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';

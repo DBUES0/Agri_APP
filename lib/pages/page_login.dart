@@ -129,6 +129,25 @@ class _LoginPageState extends State<LoginPage> {
   }
 
 
+
+/*
+// En el body de tu Scaffold o en tu AppBar
+Center(
+  child: Column(
+    children: [
+      // Tu nuevo logo mixto y escalable
+      AppTheme.buildLogo(fontSize: 42), 
+      
+      const SizedBox(height: 8),
+      
+      // Texto normal que usará ROBOTO automáticamente
+      const Text(
+        "Gestión de Invernaderos",
+        style: TextStyle(letterSpacing: 1.2),
+      ),
+    ],
+  ),
+)*/
   @override
   Widget build(BuildContext context) {
     // La UI ahora está mucho más limpia

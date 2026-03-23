@@ -1,80 +1,104 @@
 import 'package:flutter/material.dart';
-
-class AppColors {
-  // Colores principales (basados en tu estilo agrícola)
-  static const Color primario = Color(0xFF2E7D32); // Un verde bosque robusto
-  static const Color secundario = Color(0xFFFFA000); // Un naranja ámbar para avisos/detalles
-  static const Color fondo = Color(0xFFF5F5F5); // Gris muy claro para el fondo
-  static const Color error = Color(0xFFD32F2F);
-  static const Color tarjetas = Colors.white;
-}
-
+import 'app_palette.dart';
+import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
+
+  // Definimos la fuente del logo usando Google Fonts (Lato es casi idéntica a Corbel)
+  static TextStyle get logoTextStyle => GoogleFonts.lato(
+        fontWeight: FontWeight.bold,
+      );
+
+  // WIDGET FUNCIONAL: Para pintar el logo AgriAPP mixto
+  static Widget buildLogo({double fontSize = 30}) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'Agri',
+            style: logoTextStyle.copyWith(
+              fontSize: fontSize,
+              color: AgriPalette.greyMain, // Gris plomo
+            ),
+          ),
+          TextSpan(
+            text: 'APP',
+            style: logoTextStyle.copyWith(
+              fontSize: fontSize,
+              color: AgriPalette.greenMain, // Verde lima
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Nombre de la familia de fuente definida en pubspec.yaml para el logo
+  static const String logoFont = 'AgriLogoFont'; 
+
   static ThemeData get lightTheme {
     return ThemeData(
-      useMaterial3: true, // Habilita el diseño moderno de Google
+      useMaterial3: true,
+      
+      // 1. FUENTE GLOBAL: Roboto (por defecto en Flutter)
+      fontFamily: 'Roboto',
+
+      // 2. ESQUEMA DE COLORES
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primario,
-        primary: AppColors.primario,
-        secondary: AppColors.secundario,
-        surface: AppColors.tarjetas,
-        background: AppColors.fondo,
-        error: AppColors.error,
-      ),
-      
-      // Armonización de Fuentes
-      fontFamily: 'Roboto', // O la que prefieras (asegúrate de incluirla en pubspec.yaml)
-      
-      // Estilo global de las AppBar
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.primario,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
+        seedColor: AgriPalette.greenMain,
+        primary: AgriPalette.greenMain,
+        secondary: AgriPalette.greyMain,
+        surface: AgriPalette.white,
+        background: AgriPalette.background,
+        error: AgriPalette.error,
       ),
 
-      // Estilo global de los Botones
+      // 3. COMPONENTES ARMONIZADOS
+      scaffoldBackgroundColor: AgriPalette.background,
+      
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AgriPalette.greenMain,
+        foregroundColor: AgriPalette.white,
+        centerTitle: true,
+        elevation: 0,
+      ),
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primario,
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+          backgroundColor: AgriPalette.greenMain,
+          foregroundColor: AgriPalette.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
 
-      // Estilo de los campos de texto (Input)
-    // inputDecorationTheme: InputDecorationTheme(
-    //   filled: true,             // Añade un ligero fondo
-    //   fillColor: Colors.white,   // Fondo blanco para que no se vea transparente
-    //   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), // Espacio interno
-    //   border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
-    //     focusedBorder: OutlineInputBorder(
-    //       borderRadius: BorderRadius.circular(12),
-    //       borderSide: const BorderSide(color: AppColors.primario, width: 20),
-    //     ),
-    //   ),
-inputDecorationTheme: InputDecorationTheme(
-  filled: true,
-  fillColor: Colors.white,
-  isDense: false, // Permite que el campo use su altura natural
-  contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11), // Más altura interna
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
-    borderSide: BorderSide(color: Colors.grey.shade400),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
-    borderSide: BorderSide(color: Colors.grey.shade300),
-  ),
-  focusedBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
-    borderSide: const BorderSide(color: AppColors.primario, width: 2),
-  ),
-  // Esto ayuda a que el label (Almacén de Destino) no se monte con el borde superior
-  floatingLabelBehavior: FloatingLabelBehavior.always, 
-),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AgriPalette.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AgriPalette.greyMain),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AgriPalette.greenMain, width: 2),
+        ),
+      ),
+    );
+  }
 
+  // 4. ESTILO ESPECÍFICO PARA EL LOGO
+  // Úsalo solo donde quieras que aparezca la fuente del logo
+  static TextStyle getLogoStyle({
+    double size = 24, 
+    Color color = AgriPalette.greyMain, 
+    bool isBold = false
+  }) {
+    return TextStyle(
+      fontFamily: logoFont,
+      fontSize: size,
+      color: color,
+      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
     );
   }
 }

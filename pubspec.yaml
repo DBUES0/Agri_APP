@@ -1,5 +1,5 @@
 
-name: AgriAPP 
+name: agriapp
 description: Flutter app para login y visualización de datos del agricultor.
 publish_to: 'none'
 
@@ -17,12 +17,12 @@ dependencies:
   image_picker: ^1.2.1
   url_launcher: ^6.3.2
   open_filex: ^4.7.0
+  google_fonts: ^6.3.2  # O la versión más reciente
 
-
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "assets/icon.png"
+# flutter_icons:
+#   android: true
+#   ios: true
+#   image_path:  "android/app/src/main/res/imagenes/logo_maximizada.png"
 
 
 dev_dependencies:
@@ -33,10 +33,19 @@ dev_dependencies:
 
 flutter_native_splash:
   color: "#ffffff"
-  image: assets/splash_icon.png
+  image:  "assets/logo_maximizada.png"
   android: true
   ios: true
   web: false
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo_maximizada.png"
+  remove_alpha_ios: true 
+  adaptive_icon_background: "#ffffff" # Recomendado para Android moderno

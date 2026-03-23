@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Agri App',
+      title: 'Agri APP',
       //theme: ThemeData(primarySwatch: Colors.green),
       theme: AppTheme.lightTheme,
       home: const LoginPage(),
