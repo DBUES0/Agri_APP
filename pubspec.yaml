@@ -32,7 +32,7 @@ dev_dependencies:
   flutter_native_splash: ^2.3.5
 
 flutter_native_splash:
-  color: "#ffffff"
+  color: "#F5F5F5" # <--- ESTE ES EL CAMBIO CLAVE
   image:  "assets/logo_maximizada.png"
   android: true
   ios: true
@@ -48,4 +48,5 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/logo_maximizada.png"
   remove_alpha_ios: true 
-  adaptive_icon_background: "#ffffff" # Recomendado para Android moderno
+  adaptive_icon_background: "f5f5f5"
+#"#ffffff" # Recomendado para Android moderno

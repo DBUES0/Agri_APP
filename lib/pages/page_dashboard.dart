@@ -3,6 +3,8 @@ import 'package:agriapp/utils/ui_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import 'package:agriapp/utils/app_theme.dart';
+import 'package:agriapp/utils/app_palette.dart';
 
 // Importación de todos los modelos (Records) que definen la estructura de los datos
 import '../models/record_usuario.dart';
@@ -15,6 +17,7 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../pages/page_albaran.dart';
+
 
 /// [DashboardPage] es la pantalla principal tras el login.
 /// Recibe por constructor TODA la información cargada inicialmente.
@@ -92,26 +95,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _refreshAlbaranes() async {
           _albaranes = (await _apiService.fetchParticular('albaranes'))
           .map((json) => Albaran.fromJson(json)).toList();
-    // final prefs = await SharedPreferences.getInstance();
-    // final token = prefs.getString('token');
-    // if (token == null) return;
+     mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
 
-    // final uri = Uri.parse('https://api.bueso.duckdns.org/api/albaranes');
-    // final response = await http.get(uri, headers: {
-    //   'Content-Type': 'application/json',
-    //   'Authorization': 'Bearer $token'
-    // });
-
-    // if (response.statusCode == 200) {
-    //   final List<dynamic> jsonData = json.decode(response.body);
-    //   setState(() {
-    //     // Mapeamos el JSON de respuesta a objetos de tipo 'Albaran'
-    //     _albaranes = jsonData.map((e) => Albaran.fromJson(e)).toList();
-    //   });
-    //   // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Albaranes Actualizados')));
-     mensajeEmergente(context, 'Albaranes Actualizados');
-
-    // }
   }
 
 
@@ -119,11 +104,12 @@ class _DashboardPageState extends State<DashboardPage> {
   // Los métodos _refreshGastos y _refreshOperaciones están preparados 
   // para cuando crees sus respectivos endpoints en tu servidor PHP.
   Future<void> _refreshGastos() async {
-    print("Simulando refresco de Gastos...");
+    mensajeEmergente(context, 'Simulando refresco de Gastos...',segundos: 1 );
+    //"Simulando refresco de Gastos...");
   }
 
   Future<void> _refreshOperaciones() async {
-    print("Simulando refresco de Operaciones...");
+    mensajeEmergente(context, 'Simulando refresco de Operaciones...',segundos: 1);
   }
 
   /// Lógica para realizar el borrado lógico (marcar como eliminado_bit = 1)
@@ -214,16 +200,45 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Al tocar el nombre, no hace nada (onTap vacío), pero se podría usar para algo.
-        title: Text('${widget.usuario.nombre} ${widget.usuario.apellidos}'),
+              centerTitle: false,
+              // En lugar de usar 'leading', ponemos todo en el 'title' 
+              // para que fluya de forma natural hacia la derecha.
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppTheme.buildLogo(fontSize: 22), // El logo mixto
+                  const SizedBox(width: 22),        // Un poco de separación
+                  Expanded(
+                    child: Text(
+                      '${widget.usuario.nombre} ${widget.usuario.apellidos}',
+                      style:  Theme.of(context).textTheme.titleMedium, //const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+                      overflow: TextOverflow.ellipsis, // Por si el nombre es muy largo
+                    ),
+                  ),
+                ],
+              ),
+
+        // 3. ICONOS DE FUNCIÓN A LA DERECHA (se mantienen en actions)
         actions: [
-          IconButton(icon: const Icon(Icons.sync), onPressed: _refreshAll),
-          IconButton(icon: const Icon(Icons.edit), onPressed: _goToUsuario),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: 'Sincronizar', // Ayuda al usuario
+            onPressed: _refreshAll,
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Editar Perfil',
+            onPressed: _goToUsuario,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar Sesión',
+            onPressed: _logout,
+          ),
         ],
       ),
       body: ListView(
@@ -267,15 +282,16 @@ class _DashboardPageState extends State<DashboardPage> {
             // Cabecera de la sección: Muestra el total de kilos de la explotación.
             ListTile(
               title: Text('Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  //style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              style: Theme.of(context).textTheme.titleLarge),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(icon: const Icon(Icons.add), onPressed: () => _goToAlbaran()),
-                  IconButton(
-                    icon: Icon(_albaranesExpanded ? Icons.expand_less : Icons.expand_more), 
-                    onPressed: () => setState(() => _albaranesExpanded = !_albaranesExpanded)
-                  ),
+                  IconButton(icon: const Icon(Icons.add), color: AgriPalette.greenMain, onPressed: () => _goToAlbaran()),
+                  // IconButton(
+                  //   icon: Icon(_albaranesExpanded ? Icons.expand_less : Icons.expand_more), 
+                  //   onPressed: () => setState(() => _albaranesExpanded = !_albaranesExpanded)
+                  // ),
                 ],
               ),
               onTap: () => setState(() => _albaranesExpanded = !_albaranesExpanded),
@@ -308,7 +324,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     // Título de la Finca con su rendimiento (kg/m²)
                     ListTile(
                       title: Text('${fincaObj.nombreStr} ${fincaKg.toStringAsFixed(0)} kg (${kgM2.toStringAsFixed(1)} kg/m²)', 
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                          style:  Theme.of(context).textTheme.titleMedium),//const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                       onTap: () => setState(() => _expandedFincas[entry.key] = !isExpanded),
                     ),
                     
@@ -326,12 +342,12 @@ class _DashboardPageState extends State<DashboardPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ListTile(
-                                  title: Text('${albaran.fecha.day}/${albaran.fecha.month}/${albaran.fecha.year} - ${albaranKg.toStringAsFixed(0)} kg'),
+                                  title: Text('${albaran.fecha.day}/${albaran.fecha.month}/${albaran.fecha.year} - ${albaranKg.toStringAsFixed(0)} kg', style:  Theme.of(context).textTheme.bodyLarge,),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(icon: const Icon(Icons.edit), onPressed: () => _goToAlbaran(albaran: albaran)),
-                                      IconButton(icon: const Icon(Icons.delete), onPressed: () => _confirmDeleteAlbaran(albaran.kalbaran)),
+                                      IconButton(icon: const Icon(Icons.edit),  color: AgriPalette.greenMain, onPressed: () => _goToAlbaran(albaran: albaran)),
+                                      IconButton(icon: const Icon(Icons.delete),  color: AgriPalette.greenMain, onPressed: () => _confirmDeleteAlbaran(albaran.kalbaran)),
                                     ],
                                   ),
                                   onTap: () => setState(() => _expandedAlbaranes[aEntry.key] = !expanded),
@@ -359,9 +375,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                         return ListTile(
                                           dense: true,
                                           // Mostramos la línea, el nombre del producto y los kg
-                                          title: Text('Línea ${d.linea}: ${producto.productoStr} -> ${d.kg.toStringAsFixed(2)} kg'),
+                                          title: Text('Línea ${d.linea}: ${producto.productoStr} -> ${d.kg.toStringAsFixed(2)} kg',style:  Theme.of(context).textTheme.bodyMedium,),
                                           // Opcional: Podrías añadir el tipo de producto como subtítulo si quieres
-                                          subtitle: Text(producto.tipoproductoStr, style: const TextStyle(fontSize: 10)),
+                                          subtitle: Text(producto.tipoproductoStr, style:  Theme.of(context).textTheme.bodySmall),//const TextStyle(fontSize: 10)),
                                         );
                                       }).toList(),
                                     ),
@@ -393,8 +409,8 @@ class _DashboardPageState extends State<DashboardPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.add), color: colorAccion, onPressed: onAdd),
+                Text(title, style:  Theme.of(context).textTheme.titleLarge),//const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.add),  color: AgriPalette.greenMain, onPressed: onAdd),
               ],
             ),
             if (extra != null) extra, // Si pasamos un widget extra (como la fecha de jornadas), se muestra aquí.

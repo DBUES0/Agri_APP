@@ -24,7 +24,7 @@ class AppTheme {
             text: 'APP',
             style: logoTextStyle.copyWith(
               fontSize: fontSize,
-              color: AgriPalette.greenMain, // Verde lima
+              color: AgriPalette.greenMain2, // Verde lima
             ),
           ),
         ],
@@ -49,15 +49,16 @@ class AppTheme {
         secondary: AgriPalette.greyMain,
         surface: AgriPalette.white,
         background: AgriPalette.background,
-        error: AgriPalette.error,
+        error: AgriPalette.error        
       ),
 
       // 3. COMPONENTES ARMONIZADOS
-      scaffoldBackgroundColor: AgriPalette.background,
+      //scaffoldBackgroundColor: AgriPalette.background,
+      scaffoldBackgroundColor:AgriPalette.backgroundLogo,// Color uniforme en toda la App
       
       appBarTheme: const AppBarTheme(
-        backgroundColor: AgriPalette.greenMain,
-        foregroundColor: AgriPalette.white,
+        backgroundColor: AgriPalette.backgroundLogo,
+        foregroundColor: AgriPalette.textoVerdeOscuro,
         centerTitle: true,
         elevation: 0,
       ),
@@ -72,8 +73,10 @@ class AppTheme {
       ),
 
       inputDecorationTheme: InputDecorationTheme(
+        // filled: true,
+        // fillColor: AgriPalette.white,
         filled: true,
-        fillColor: AgriPalette.white,
+        fillColor: Colors.white, // O Color(0xFFEEEEEE) para un tono suave
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -82,6 +85,39 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AgriPalette.greenMain, width: 2),
+        ),
+      ),
+  
+      textTheme: TextTheme(
+        // Nivel 1: Títulos de sección (Ej: Albaranes: 41609 kg)
+        titleLarge: TextStyle(
+          color: AgriPalette.textoVerdeOscuro,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+        // Nivel 2: Subtítulos importantes (Ej: Nave 1 21827 kg)
+        titleMedium: TextStyle(
+          color: AgriPalette.textoVerdeOscuro, // Un gris un poco más oscuro
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+        // Nivel 3: Listas de fechas (Ej: 24/3/2026 - 126 kg)
+        bodyLarge: TextStyle(
+          color: AgriPalette.textoVerdeOscuro,
+          fontWeight: FontWeight.w500,
+          fontSize: 15,
+        ),
+        // Nivel 4: Detalles técnicos (Ej: Línea 1: Pimientos)
+        bodySmall: TextStyle(
+          color: AgriPalette.textoVerdeOscuro,
+          fontSize: 13,
+        //  fontStyle: FontStyle.italic,
+        ),
+        bodyMedium: TextStyle(
+          color: AgriPalette.textoVerdeOscuro,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          //fontStyle: FontStyle.italic,
         ),
       ),
     );

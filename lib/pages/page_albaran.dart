@@ -124,124 +124,6 @@ String? _obtenerUltimoAlmacenUsado() {
     return temporales.first.kalmacen;
   }
 
-  // /// Función principal para enviar los datos al servidor PHP.
-  // Future<void> _guardarAlbaran() async {
-  //   // Primero comprobamos que el formulario sea válido (campos obligatorios).
-  //   if (!_formKey.currentState!.validate()) return;
-
-  //   try {
-  //     // ID fijo que corresponde a "ALBARAN" en tu tabla 'tbltipoalbaran'.
-  //     const String uuidAlbaranTipo = "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df";
-      
-  //     // Creamos el "paquete" (JSON) con los datos de la cabecera del albarán.
-  //     final Map<String, dynamic> albaranData = {
-  //       'fecha_dtm':      _fecha.toIso8601String(),
-  //       'kalmacen':       _selectedAlmacen,
-  //       'ktipodeprecio':  _selectedTipoPrecio,
-  //       'comentario_str': _comentarioCabeceraController.text,
-  //       'idalbaran_str':  _idAlbaranAlmacenController.text,
-  //       'ktipoalbaran':   uuidAlbaranTipo, 
-  //       // AÑADE ESTO: Enviamos solo los IDs de los archivos actuales
-  //       'archivos_ids': _archivos.map((a) => a.karchivos).toList(),
-  //     };
-
-  //     String kalbaranId;
-  //     // PASO 1: Guardar la cabecera.
-  //     if (widget.albaran == null) {
-  //       if(_detalles.isEmpty){
-  //         // --- SUSTITUCIÓN DEL PRINT POR MENSAJE VISUAL ---
-  //         // ScaffoldMessenger.of(context).showSnackBar(
-  //         //   const SnackBar(
-  //         //     content: Text('No puedes guardar un albarán sin productos. Añade al menos uno.'),
-  //         //     backgroundColor: Colors.orange, // Color de advertencia
-  //         //     duration: Duration(seconds: 3),   // Tiempo que se queda en pantalla
-  //         //   ),
-  //         // );
-  //         mensajeEmergente(context, 'No puedes guardar un albarán sin productos. Añade al menos uno.');
-  //         return; // Importante: ponemos 'return' para que el código se pare aquí y no intente guardar nada
-  //       } else {
-  //         // Si es nuevo, usamos POST (Crear).
-  //         final response = await _apiService.postParticular('albarancabecera', albaranData);
-  //         kalbaranId = response['kalbaran']; // Guardamos el ID que nos inventó la base de datos.
-  //      }
-  //     } else {
-  //       // Si ya existía, usamos PUT (Editar).
-  //       kalbaranId = widget.albaran!.kalbaran;
-  //       await _apiService.putGeneric('tblalbaran', kalbaranId, albaranData);
-  //     }
-
-  //     // PASO 2: Procesar los detalles (los renglones de la lista).
-  //     // Recorremos la lista uno a uno.
-  //     if(_detalles.isEmpty){
-  //       print("COSAS EN EL LOG");
-  //     }else{
-  //       for (var detalle in _detalles) {
-  //         if (detalle.eliminado == 1 && detalle.kalbarandetalle.isNotEmpty) {
-  //           // Si el usuario le dio a la papelera y el detalle ya estaba en la nube, lo borramos allí.
-  //           await _apiService.deleteGeneric('tblalbarandetalle', detalle.kalbarandetalle);
-  //         } else if (detalle.kalbarandetalle.isEmpty) {
-  //           // Si no tiene ID (es nuevo de hace un momento), lo creamos en el servidor.
-  //           await _crearDetalleEnServidor(detalle, kalbaranId);
-  //         } else {
-  //           // Si ya tenía ID y sigue ahí, simplemente actualizamos sus datos (kg, precio, etc.).
-  //           await _editarDetalleEnServidor(detalle);
-  //         }
-  //       }
-  //     }
-
-  //     // LÓGICA PARA ACTUALIZAR EL ORDEN DE FINCAS Y PRODUCTOS EN MEMORIA
-  //     final detallesValidos = _detalles.where((d) => d.eliminado == 0).toList();
-      
-  //     if (detallesValidos.isNotEmpty) {
-  //       // 1. Obtenemos el último detalle introducido
-  //       final ultimoDetalle = detallesValidos.last;
-
-  //       // --- ACTUALIZAR POSICIÓN DE LA FINCA ---
-  //       int indexFinca = widget.fincas.indexWhere((f) => f.kfinca == ultimoDetalle.kfinca);
-  //       if (indexFinca != -1) {
-  //         final fincaPrioritaria = widget.fincas.removeAt(indexFinca);
-  //         widget.fincas.insert(0, fincaPrioritaria);
-  //       }
-
-  //       // --- ACTUALIZAR POSICIÓN DEL PRODUCTO ---
-  //       int indexProd = widget.productos.indexWhere((p) => p.kproducto == ultimoDetalle.kproducto);
-  //       if (indexProd != -1) {
-  //         // Extraemos el producto de su sitio actual y lo ponemos el primero
-  //         final productoPrioritario = widget.productos.removeAt(indexProd);
-  //         widget.productos.insert(0, productoPrioritario);
-  //       }
-        
-  //       // Nota: Al modificar las listas 'widget.fincas' y 'widget.productos', 
-  //       // los cambios persisten en el Dashboard mientras no se reinicie la app.
-  //     }
-
-  //     // Si todo ha ido bien, cerramos la pantalla y volvemos al Dashboard.
-  //     if (!mounted) return;
-  //     Navigator.pop(context, true);
-  //   } catch (e) {
-  //     // Si hay un error (ej. no hay internet), mostramos un aviso rojo abajo.
-  //     // ScaffoldMessenger.of(context).showSnackBar(
-  //     //   SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)
-  //     mensajeEmergente(context,  'Error: $e', colorFondo: Colors.red);
-  //   }
-  // }
-
-  // /// Función de apoyo para insertar un renglón nuevo.
-  // Future<void> _crearDetalleEnServidor(AlbaranDetalle d, String kalbaran) async {
-  //   final body = {
-  //     'kalbaran': kalbaran,
-  //     'kfinca': d.kfinca,
-  //     'kg_float': d.kg,
-  //     'numeropallets_int': d.pallets,
-  //     'numerocajas_int': d.cajas,
-  //     'precio_flt': d.precio ?? 0.0, 
-  //     'kproducto': d.kproducto,
-  //     'comentario_str': d.comentario ?? "",
-  //     'kagricultor': d.kagricultor,
-  //   };
-  //   await _apiService.postParticular('albarandetalles', body);
-  // }
-
 
 Future<void> _guardarAlbaran() async {
     if (!_formKey.currentState!.validate()) return;
@@ -340,18 +222,18 @@ Future<void> _guardarAlbaran() async {
 
 
   /// Función de apoyo para modificar un renglón que ya existía.
-  Future<void> _editarDetalleEnServidor(AlbaranDetalle d) async {
-    final body = {
-      'kfinca': d.kfinca,
-      'kg_float': d.kg,
-      'numeropallets_int': d.pallets,
-      'numerocajas_int': d.cajas,
-      'precio_flt': d.precio,
-      'kproducto': d.kproducto,
-      'comentario_str': d.comentario,
-    };
-    await _apiService.putGeneric('tblalbarandetalle', d.kalbarandetalle, body);
-  }
+  // Future<void> _editarDetalleEnServidor(AlbaranDetalle d) async {
+  //   final body = {
+  //     'kfinca': d.kfinca,
+  //     'kg_float': d.kg,
+  //     'numeropallets_int': d.pallets,
+  //     'numerocajas_int': d.cajas,
+  //     'precio_flt': d.precio,
+  //     'kproducto': d.kproducto,
+  //     'comentario_str': d.comentario,
+  //   };
+  //   await _apiService.putGeneric('tblalbarandetalle', d.kalbarandetalle, body);
+  // }
 
   /// Muestra una ventana de confirmación antes de guardar.
   void _mostrarConfirmacionGuardar() async {
@@ -372,139 +254,6 @@ Future<void> _guardarAlbaran() async {
     // Si el usuario pulsó 'Sí', llamamos a la función de guardado real.
     if (confirm == true) await _guardarAlbaran();
   }
-
-// void _mostrarOAnadirArchivos() async {
-//       final confirm = await showDialog<bool>(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: const Text('Aquí es donde se verían los archivos adjuntos.'),
-//         actions: [
-//           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Si')),
-//           ElevatedButton(
-//             style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
-//             onPressed: () => Navigator.pop(context, true), 
-//             child: const Text('No', style: TextStyle(color: Colors.white))
-//           ),
-//         ],
-//       ),
-//     );
-//     // Si el usuario pulsó 'Sí', llamamos a la función de guardado real.
-//     //if (confirm == true) await _guardarAlbaran();
-
-// Future<void> _mostrarOAnadirArchivos_borrar() async {
-//   showModalBottomSheet(
-//     context: context,
-//     builder: (context) => StatefulBuilder(
-//       builder: (context, setModalState) => Container(
-//         padding: const EdgeInsets.all(16),
-//         child: Column(
-//           mainAxisSize: MainAxisSize.min,
-//           children: [
-//             const Text('Archivos del Albarán', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-//             const Divider(),
-//             // Lista de archivos actuales
-//             ..._archivos.map((archivo) => ListTile(
-//               leading: const Icon(Icons.insert_drive_file),
-//               title: Text(archivo.nombrearchivo),
-//               trailing: IconButton(
-//                 icon: const Icon(Icons.delete, color: Colors.red),
-//                 onPressed: () {
-//                   setState(() => _archivos.remove(archivo));
-//                   setModalState(() {}); // Actualiza el modal
-//                 },
-//               ),
-//             )),
-//             ListTile(
-//               leading: const Icon(Icons.add_a_photo, color: colorAccion),
-//               title: const Text('Añadir nuevo archivo'),
-//               onTap: () async {
-//                 await _seleccionarYSubirArchivo();
-//                 setModalState(() {}); // Refresca la lista en el modal
-//               },
-//             ),
-//           ],
-//         ),
-//       ),
-//     ),
-//   );
-// }
-
-//COSA1
-// Future<void> _mostrarOAnadirArchivos() async {
-//   showModalBottomSheet(
-//     context: context,
-//     isScrollControlled: true,
-//     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-//     builder: (context) => SafeArea(
-//       child: StatefulBuilder(
-//         builder: (context, setModalState) => Padding(
-//           padding: const EdgeInsets.all(16.0),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               const Text('Archivos Adjuntos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-//               const Divider(),
-//               // Lista de archivos actuales
-//               if (_archivos.isEmpty) 
-//                 const Padding(padding: EdgeInsets.all(20), child: Text('No hay archivos adjuntos')),
-//               ..._archivos.map((archivo) => ListTile(
-//                 leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
-//                 title: Text(archivo.nombrearchivo),
-//                 // onTap: () => _apiService.descargarYVerArchivo(archivo.karchivos),
-//                 onTap: () async {
-//                   try {
-//                     await _apiService.descargarYVerArchivo(archivo.karchivos);
-//                   } catch (e) {
-//                     mensajeEmergente(context, e.toString());
-//                   }
-//                 },
-//                 // trailing: IconButton(
-//                 //   icon: const Icon(Icons.delete, color: Colors.red),
-//                 //   onPressed: () {
-//                 //     setState(() => _archivos.remove(archivo));
-//                 //     setModalState(() {});
-//                 //   },
-//                 // ),
-//                 trailing: IconButton(
-//                 icon: const Icon(Icons.delete, color: Colors.red),
-//                 onPressed: () {
-//                   setState(() {
-//                     // CAMBIO AQUÍ: En vez de remover, marcamos como eliminado
-//                     // _archivos.remove(archivo);  <-- BORRAR ESTA LÍNEA
-                    
-//                     // NUEVA LÓGICA DE BORRADO LÓGICO
-//                     // Nota: Tu clase Archivo no tiene 'eliminado_bit' o 'eliminado'. 
-//                     // Debes asegurarte de añadirlo a tu modelo record_albaran.dart
-//                     archivo.eliminado = 1; // o eliminado_bit = 1, según tu modelo
-//                   });
-//                   setModalState(() {});
-//                 },
-//               ),
-//               )),
-//               const Divider(),
-//               ListTile(
-//                 leading: const Icon(Icons.camera_alt, color: Colors.green),
-//                 title: const Text('Hacer Foto'),
-//                 onTap: () { Navigator.pop(context); _obtenerImagen(ImageSource.camera); },
-//               ),
-//               ListTile(
-//                 leading: const Icon(Icons.photo_library, color: Colors.purple),
-//                 title: const Text('Elegir de Galería'),
-//                 onTap: () { Navigator.pop(context); _obtenerImagen(ImageSource.gallery); },
-//               ),
-//               ListTile(
-//                 leading: const Icon(Icons.attach_file, color: Colors.orange),
-//                 title: const Text('Adjuntar Archivo/PDF'),
-//                 onTap: () { Navigator.pop(context); _seleccionarYSubirArchivo(); },
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     ),
-//   );
-// }
-
 
 Future<void> _mostrarOAnadirArchivos() async {
   showModalBottomSheet(

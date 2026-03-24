@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 // Paleta de colores oficial extraída exactamente del logotipo.
 class AgriPalette {
   // El verde lima vibrante de la hoja y los campos. Ideal para acciones principales y acentos.
-  static const Color greenMain = Color(0xFFA4C639);
-  
+  static const Color greenMain2 = Color(0xFFA4C639);
+  static const Color greenMain = Color.fromARGB(255, 55, 93, 55); 
   // El gris plomo sobrio del pin de localización. Perfecto para texto secundario y bordes.
   static const Color greyMain = Color(0xFF9E9E9E);
 
@@ -17,4 +17,6 @@ class AgriPalette {
   static const Color border = Color(0xFFE0E0E0); // Gris más claro para bordes de inputs
   static const Color white = Colors.white;
   static const Color error = Color(0xFFD32F2F);
+  static const Color backgroundLogo =   Color(0xFFF5F5F5); // Un
+  static const Color textoVerdeOscuro =Color.fromARGB(255, 55, 93, 55); // Para texto destacado o títulos
 }
