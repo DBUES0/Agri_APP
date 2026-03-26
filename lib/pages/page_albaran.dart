@@ -9,6 +9,10 @@ import 'package:file_picker/file_picker.dart'; // Necesitas añadir esto al pubs
 import 'package:uuid/uuid.dart'; // Importa la librería
 import 'package:image_picker/image_picker.dart'; // Para tomar fotos con la cámara o elegir de la galería
 import '../utils/ui_utils.dart';
+import '../utils/app_theme.dart';
+import '../utils/app_palette.dart';
+
+
 
 /// [PageAlbaran] es una pantalla de tipo 'StatefulWidget'. 
 /// Esto significa que es una página que puede cambiar lo que muestra (dinámica),
@@ -479,9 +483,13 @@ showDialog(
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            // Obtenemos el 80% del ancho de la pantalla actual
+            double ancho80 = MediaQuery.of(context).size.width * 0.9;
             return AlertDialog(
-              title: Text(detalle == null ? 'Nuevo Detalle' : 'Editar Detalle'),
-              content: SingleChildScrollView(
+             title: Text(detalle == null ? 'Nuevo Detalle' : 'Editar Detalle'),
+             content: SizedBox(
+              width: ancho80, // <--- Aquí aplicamos el 80%
+              child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -495,6 +503,8 @@ showDialog(
                       )).toList(),
                       onChanged: (v) => setDialogState(() => _selectedFinca = v),
                     ),
+                    const SizedBox(height: 10),
+
                     // Desplegable de Productos (Filtrado por Hortalizas y Preseleccionado)
                     DropdownButtonFormField<String>(
                       value: _selectedProducto,
@@ -505,26 +515,34 @@ showDialog(
                       )).toList(),
                       onChanged: (v) => setDialogState(() => _selectedProducto = v),
                     ),
+
+                     const SizedBox(height: 10),
                     TextField(
                       controller: _kgController, 
                       decoration: const InputDecoration(labelText: 'Kilos'), 
                       keyboardType: TextInputType.number
                     ),
+                     const SizedBox(height: 10),
                     TextField(
                       controller: _palletsController, 
                       decoration: const InputDecoration(labelText: 'Pallets'), 
                       keyboardType: TextInputType.number
                     ),
+                     const SizedBox(height: 10),
                     TextField(
                       controller: _cajasController, 
                       decoration: const InputDecoration(labelText: 'Cajas'), 
                       keyboardType: TextInputType.number
                     ),
+                    
+                     const SizedBox(height: 10),
                     TextField(
                       controller: _precioController, 
                       decoration: const InputDecoration(labelText: 'Precio €'), 
                       keyboardType: TextInputType.number
                     ),
+                    
+                     const SizedBox(height: 10),
                     TextField(
                       controller: _comentarioDetController, 
                       decoration: const InputDecoration(labelText: 'Comentario línea')
@@ -532,6 +550,7 @@ showDialog(
                   ],
                 ),
               ),
+            ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context), 
@@ -616,9 +635,9 @@ showDialog(
         actions: [
           // Botón de guardar arriba a la derecha.
           
-          IconButton(icon: const Icon(Icons.attach_file), color: colorAccion, onPressed: _mostrarOAnadirArchivos),
+          IconButton(icon: const Icon(Icons.attach_file), color: AgriPalette.greenMain, onPressed: _mostrarOAnadirArchivos),
 
-          IconButton(icon: const Icon(Icons.save), color: colorAccion, onPressed: _mostrarConfirmacionGuardar)
+          IconButton(icon: const Icon(Icons.save), color: AgriPalette.greenMain, onPressed: _mostrarConfirmacionGuardar)
         ],
       ),
       body: Padding(
@@ -633,7 +652,7 @@ showDialog(
                     // Fila para elegir la fecha.
                     ListTile(
                       title: Text('Fecha: ${_fecha.day}/${_fecha.month}/${_fecha.year}'),
-                      trailing: const Icon(Icons.calendar_today),
+                      trailing: const Icon(Icons.calendar_today, color: AgriPalette.greenMain),
                       onTap: () async {
                         // Abre el calendario del sistema Android.
                         final p = await showDatePicker(context: context, initialDate: _fecha, firstDate: DateTime(2020), lastDate: DateTime(2100));
@@ -651,11 +670,13 @@ showDialog(
                       onChanged: (v) => setState(() => _selectedAlmacen = v),
                       validator: (v) => v == null ? 'Seleccione almacén' : null,
                     ),
+                    const SizedBox(height: 20),
                     // Cuadro para poner el número de albarán que nos dan en el almacén.
                     TextField(
                       controller: _idAlbaranAlmacenController,
                       decoration: const InputDecoration(labelText: 'Nº Albarán Almacén'),
                     ),
+                    const SizedBox(height: 20),
                     // Cuadro para notas de voz o escritas generales.
                     TextField(
                       controller: _comentarioCabeceraController,
@@ -667,7 +688,7 @@ showDialog(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('PRODUCTOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        IconButton(icon: const Icon(Icons.add_circle), color: colorAccion, iconSize: 32, onPressed: () => _mostrarDialogoDetalle()),
+                        IconButton(icon: const Icon(Icons.add_circle), color:  AgriPalette.greenMain, iconSize: 32, onPressed: () => _mostrarDialogoDetalle()),
                       ],
                     ),
                     // Generamos la lista de "Tarjetas" (Cards) con cada producto añadido.

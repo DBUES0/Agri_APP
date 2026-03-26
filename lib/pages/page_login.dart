@@ -14,6 +14,8 @@ import '../models/record_tipogasto.dart';
 import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
+import '../utils/app_theme.dart';
+import '../utils/app_palette.dart';
 
 // Importamos la página de destino
 import 'page_usuario.dart';
@@ -129,64 +131,64 @@ class _LoginPageState extends State<LoginPage> {
   }
 
 
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    // Eliminamos el AppBar para un look más moderno y centrado (opcional)
+    body: Padding(
+      padding: const EdgeInsets.all(24.0), // Un poco más de aire lateral
+      child: Column(
+        children: [
+          // Este Spacer empuja todo hacia abajo. 
+          // Al poner un flex de 2 abajo y nada arriba (o un spacer pequeño), sube el bloque.
+          const Spacer(flex: 2), 
 
-/*
-// En el body de tu Scaffold o en tu AppBar
-Center(
-  child: Column(
-    children: [
-      // Tu nuevo logo mixto y escalable
-      AppTheme.buildLogo(fontSize: 42), 
-      
-      const SizedBox(height: 8),
-      
-      // Texto normal que usará ROBOTO automáticamente
-      const Text(
-        "Gestión de Invernaderos",
-        style: TextStyle(letterSpacing: 1.2),
-      ),
-    ],
-  ),
-)*/
-  @override
-  Widget build(BuildContext context) {
-    // La UI ahora está mucho más limpia
-    return Scaffold(
-      appBar: AppBar(title: const Text("Gestión Agrícola - Login")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController, 
-              decoration: const InputDecoration(labelText: 'Correo electrónico', border: OutlineInputBorder()),
+          // --- BLOQUE DE LOGO ---
+          AppTheme.buildLogo(fontSize: 48),
+          const SizedBox(height: 10),
+          Text(
+            "Gestión de Invernaderos",
+            style: Theme.of(context).textTheme.bodyMedium, // Usamos el tema
+          ),
+          
+          const SizedBox(height: 60), // Espacio entre logo y campos
+
+          // --- BLOQUE DE FORMULARIO ---
+          TextField(
+            controller: _emailController,
+            decoration: const InputDecoration(labelText: 'Correo electrónico'),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _passwordController,
+            decoration: const InputDecoration(labelText: 'Contraseña'),
+            obscureText: true,
+          ),
+          const SizedBox(height: 30),
+          
+          _isLoading 
+            ? const CircularProgressIndicator() 
+            : ElevatedButton(
+                onPressed: _login, 
+                child: const Text("ENTRAR"),
+              ),
+              
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              _error, 
+              style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold), 
+              textAlign: TextAlign.center
             ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: _passwordController, 
-              decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder()),
-              obscureText: true,
-            ),
-            const SizedBox(height: 25),
-            
-            // Si está cargando, mostramos un círculo. Si no, el botón.
-            _isLoading 
-              ? const CircularProgressIndicator() 
-              : ElevatedButton(
-                  onPressed: _login, 
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                  child: const Text("ENTRAR"),
-                ),
-                
-            if (_error.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(_error, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            ],
           ],
-        ),
-      ),
-    );
-  }
-}
 
+          // Este Spacer con flex 3 es más grande que el de arriba, 
+          // por lo que "empuja" el contenido hacia el 20% superior.
+          const Spacer(flex: 6), 
+        ],
+      ),
+    ),
+  );
+}
+}

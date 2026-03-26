@@ -63,31 +63,77 @@ class AppTheme {
         elevation: 0,
       ),
 
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AgriPalette.greenMain,
-          foregroundColor: AgriPalette.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
+// Dentro de ThemeData get lightTheme
+// Cambia 'DialogTheme' por 'DialogThemeData'
+dialogTheme: DialogThemeData(
+  backgroundColor: AgriPalette.white,
+  surfaceTintColor: Colors.transparent, 
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(15),
+  ),
+  titleTextStyle: TextStyle(
+    color: AgriPalette.greyMain,
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    fontFamily: 'Roboto', // Aseguramos la fuente global
+  ),
+),
 
-      inputDecorationTheme: InputDecorationTheme(
-        // filled: true,
-        // fillColor: AgriPalette.white,
-        filled: true,
-        fillColor: Colors.white, // O Color(0xFFEEEEEE) para un tono suave
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AgriPalette.greyMain),
+// --- ESTILO DEL BOTÓN 'ENTRAR' ---
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AgriPalette.greenMain,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 50), // Ancho completo y alto 50
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AgriPalette.greenMain, width: 2),
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.1,
         ),
       ),
+    ),
+
+
+
+      // inputDecorationTheme: InputDecorationTheme(
+      //   // filled: true,
+      //   // fillColor: AgriPalette.white,
+      //   filled: true,
+      //   fillColor: Colors.white, // O Color(0xFFEEEEEE) para un tono suave
+      //   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      //   border: OutlineInputBorder(
+      //     borderRadius: BorderRadius.circular(12),
+      //     borderSide: const BorderSide(color: AgriPalette.greyMain),
+      //   ),
+      //   focusedBorder: OutlineInputBorder(
+      //     borderRadius: BorderRadius.circular(12),
+      //     borderSide: const BorderSide(color: AgriPalette.greenMain, width: 2),
+      //   ),
+      // ),
   
+  // --- ESTILO DE LOS CAMPOS DE TEXTO (USUARIO Y PASS) ---
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Colors.white,
+      // Esto replica el 'OutlineInputBorder()' que tienes ahora
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.grey),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AgriPalette.greenMain, width: 2),
+      ),
+      labelStyle: const TextStyle(color: AgriPalette.greyMain),
+    ),
+
+
       textTheme: TextTheme(
         // Nivel 1: Títulos de sección (Ej: Albaranes: 41609 kg)
         titleLarge: TextStyle(
@@ -117,7 +163,9 @@ class AppTheme {
           color: AgriPalette.textoVerdeOscuro,
           fontSize: 14,
           fontWeight: FontWeight.w400,
+          letterSpacing: 1.2,
           //fontStyle: FontStyle.italic,
+
         ),
       ),
     );

@@ -279,23 +279,43 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            InkWell( // InkWell permite que toda la fila sea pulsable para expandir
+    onTap: () => setState(() => _albaranesExpanded = !_albaranesExpanded),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0), // Ajuste fino de altura
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add), 
+            color: AgriPalette.greenMain, 
+            onPressed: () => _goToAlbaran(),
+          ),
+        ],
+      ),
+    ),
+  ),
             // Cabecera de la sección: Muestra el total de kilos de la explotación.
-            ListTile(
-              title: Text('Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
-                  //style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              style: Theme.of(context).textTheme.titleLarge),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(icon: const Icon(Icons.add), color: AgriPalette.greenMain, onPressed: () => _goToAlbaran()),
-                  // IconButton(
-                  //   icon: Icon(_albaranesExpanded ? Icons.expand_less : Icons.expand_more), 
-                  //   onPressed: () => setState(() => _albaranesExpanded = !_albaranesExpanded)
-                  // ),
-                ],
-              ),
-              onTap: () => setState(() => _albaranesExpanded = !_albaranesExpanded),
-            ),
+            // ListTile(
+            //   title: Text('Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
+            //       //style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            //   style: Theme.of(context).textTheme.titleLarge),
+            //   trailing: Row(
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: [
+            //       IconButton(icon: const Icon(Icons.add), color: AgriPalette.greenMain, onPressed: () => _goToAlbaran()),
+            //       // IconButton(
+            //       //   icon: Icon(_albaranesExpanded ? Icons.expand_less : Icons.expand_more), 
+            //       //   onPressed: () => setState(() => _albaranesExpanded = !_albaranesExpanded)
+            //       // ),
+            //     ],
+            //   ),
+            //   onTap: () => setState(() => _albaranesExpanded = !_albaranesExpanded),
+            // ),
             
             // Si la sección está expandida, mostramos el desglose por Finca
             if (_albaranesExpanded)
