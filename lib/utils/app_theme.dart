@@ -163,7 +163,7 @@ dialogTheme: DialogThemeData(
           color: AgriPalette.textoVerdeOscuro,
           fontSize: 14,
           fontWeight: FontWeight.w400,
-          letterSpacing: 1.2,
+          letterSpacing: 1.0,
           //fontStyle: FontStyle.italic,
 
         ),

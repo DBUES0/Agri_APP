@@ -9,7 +9,6 @@ import 'package:file_picker/file_picker.dart'; // Necesitas añadir esto al pubs
 import 'package:uuid/uuid.dart'; // Importa la librería
 import 'package:image_picker/image_picker.dart'; // Para tomar fotos con la cámara o elegir de la galería
 import '../utils/ui_utils.dart';
-import '../utils/app_theme.dart';
 import '../utils/app_palette.dart';
 
 
@@ -248,7 +247,7 @@ Future<void> _guardarAlbaran() async {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
+           // style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
             onPressed: () => Navigator.pop(context, true), 
             child: const Text('Guardar', style: TextStyle(color: Colors.white))
           ),
@@ -263,85 +262,88 @@ Future<void> _mostrarOAnadirArchivos() async {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    backgroundColor: AgriPalette.background, // Usamos el fondo de la app
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (context) => SafeArea(
       child: StatefulBuilder(
         builder: (context, setModalState) {
-          // Filtramos los archivos que NO están marcados como eliminados
           final archivosVisibles = _archivos.where((a) => a.eliminado == 0).toList();
 
           return Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                // TÍTULO ARMONIZADO
+                Text(
                   'Archivos Adjuntos',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AgriPalette.greyMain, // Gris plomo del logo
+                  ),
                 ),
-                const Divider(),
+                const SizedBox(height: 8),
+                Divider(color: AgriPalette.greyMain.withOpacity(0.2)),
                 
-                // Si no hay archivos visibles, mostramos un mensaje
+                // LISTADO DE ARCHIVOS
                 if (archivosVisibles.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text('No hay archivos adjuntos'),
+                  Padding(
+                    padding: const EdgeInsets.all(30),
+                    child: Text(
+                      'No hay archivos adjuntos',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: AgriPalette.greyMain,
+                      ),
+                    ),
                   ),
 
-                // Lista de archivos con borrado lógico
+                // Map de archivos con estilos del tema
                 ...archivosVisibles.map((archivo) => ListTile(
-                  leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
-                  title: Text(archivo.nombrearchivo),
+                  leading: Icon(Icons.insert_drive_file, color: AgriPalette.greenMain),
+                  title: Text(
+                    archivo.nombrearchivo,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                   onTap: () async {
                     try {
                       await _apiService.descargarYVerArchivo(archivo.karchivos);
                     } catch (e) {
-                      mensajeEmergente(context, e.toString(), colorFondo: Colors.red);
+                      // Usamos tu nueva función armonizada
+                      mensajeEmergente(context, e.toString(), tipo: 'error');
                     }
                   },
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: Icon(Icons.delete_outline, color: AgriPalette.error),
                     onPressed: () {
-                      // Cambiamos el estado a 1 (borrado lógico)
-                      // No hacemos .remove() para que el objeto siga en la lista y se envíe al PHP
-                      setState(() {
-                        archivo.eliminado = 1;
-                      });
-                      // Refrescamos el modal para que desaparezca de la vista actual
+                      setState(() => archivo.eliminado = 1);
                       setModalState(() {});
-                      mensajeEmergente(context, 'Archivo marcado para eliminar');
+                      mensajeEmergente(context, 'Archivo marcado para eliminar', tipo: 'warning');
                     },
                   ),
                 )),
 
-                const Divider(),
+                if (archivosVisibles.isNotEmpty) const Divider(),
                 
-                // Opciones para añadir nuevos archivos
-                ListTile(
-                  leading: const Icon(Icons.camera_alt, color: Colors.green),
-                  title: const Text('Hacer Foto'),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _obtenerImagen(ImageSource.camera);
-                  },
+                // OPCIONES DE AÑADIR (Colores coherentes)
+                _buildActionTile(
+                  context: context,
+                  icon: Icons.camera_alt,
+                  label: 'Hacer Foto',
+                  onTap: () => _handleFileAction(() => _obtenerImagen(ImageSource.camera)),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library, color: Colors.purple),
-                  title: const Text('Elegir de Galería'),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _obtenerImagen(ImageSource.gallery);
-                  },
+                _buildActionTile(
+                  context: context,
+                  icon: Icons.photo_library,
+                  label: 'Elegir de Galería',
+                  onTap: () => _handleFileAction(() => _obtenerImagen(ImageSource.gallery)),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.attach_file, color: Colors.orange),
-                  title: const Text('Adjuntar Archivo/PDF'),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    await _seleccionarYSubirArchivo();
-                  },
+                _buildActionTile(
+                  context: context,
+                  icon: Icons.attach_file,
+                  label: 'Adjuntar Archivo/PDF',
+                  onTap: () => _handleFileAction(_seleccionarYSubirArchivo),
                 ),
               ],
             ),
@@ -351,6 +353,125 @@ Future<void> _mostrarOAnadirArchivos() async {
     ),
   );
 }
+
+// Función auxiliar para no repetir código de cerrar modal
+void _handleFileAction(Function action) {
+  Navigator.pop(context);
+  action();
+}
+
+// Widget auxiliar para mantener los botones de acción limpios
+Widget _buildActionTile({
+  required BuildContext context,
+  required IconData icon,
+  required String label,
+  required VoidCallback onTap,
+}) {
+  return ListTile(
+    leading: Icon(icon, color: AgriPalette.greenMain), // Todos en el verde de la app
+    title: Text(
+      label,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+        fontWeight: FontWeight.w500,
+        color: AgriPalette.greyMain,
+      ),
+    ),
+    onTap: onTap,
+  );
+}
+
+// Future<void> _mostrarOAnadirArchivos() async {
+//   showModalBottomSheet(
+//     context: context,
+//     isScrollControlled: true,
+//     shape: const RoundedRectangleBorder(
+//       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//     ),
+//     builder: (context) => SafeArea(
+//       child: StatefulBuilder(
+//         builder: (context, setModalState) {
+//           // Filtramos los archivos que NO están marcados como eliminados
+//           final archivosVisibles = _archivos.where((a) => a.eliminado == 0).toList();
+
+//           return Padding(
+//             padding: const EdgeInsets.all(16.0),
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 const Text(
+//                   'Archivos Adjuntos',
+//                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+//                 ),
+//                 const Divider(),
+                
+//                 // Si no hay archivos visibles, mostramos un mensaje
+//                 if (archivosVisibles.isEmpty)
+//                   const Padding(
+//                     padding: EdgeInsets.all(20),
+//                     child: Text('No hay archivos adjuntos'),
+//                   ),
+
+//                 // Lista de archivos con borrado lógico
+//                 ...archivosVisibles.map((archivo) => ListTile(
+//                   leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
+//                   title: Text(archivo.nombrearchivo),
+//                   onTap: () async {
+//                     try {
+//                       await _apiService.descargarYVerArchivo(archivo.karchivos);
+//                     } catch (e) {
+//                       mensajeEmergente(context, e.toString(), colorFondo: Colors.red);
+//                     }
+//                   },
+//                   trailing: IconButton(
+//                     icon: const Icon(Icons.delete, color: Colors.red),
+//                     onPressed: () {
+//                       // Cambiamos el estado a 1 (borrado lógico)
+//                       // No hacemos .remove() para que el objeto siga en la lista y se envíe al PHP
+//                       setState(() {
+//                         archivo.eliminado = 1;
+//                       });
+//                       // Refrescamos el modal para que desaparezca de la vista actual
+//                       setModalState(() {});
+//                       mensajeEmergente(context, 'Archivo marcado para eliminar');
+//                     },
+//                   ),
+//                 )),
+
+//                 const Divider(),
+                
+//                 // Opciones para añadir nuevos archivos
+//                 ListTile(
+//                   leading: const Icon(Icons.camera_alt, color: Colors.green),
+//                   title: const Text('Hacer Foto'),
+//                   onTap: () async {
+//                     Navigator.pop(context);
+//                     await _obtenerImagen(ImageSource.camera);
+//                   },
+//                 ),
+//                 ListTile(
+//                   leading: const Icon(Icons.photo_library, color: Colors.purple),
+//                   title: const Text('Elegir de Galería'),
+//                   onTap: () async {
+//                     Navigator.pop(context);
+//                     await _obtenerImagen(ImageSource.gallery);
+//                   },
+//                 ),
+//                 ListTile(
+//                   leading: const Icon(Icons.attach_file, color: Colors.orange),
+//                   title: const Text('Adjuntar Archivo/PDF'),
+//                   onTap: () async {
+//                     Navigator.pop(context);
+//                     await _seleccionarYSubirArchivo();
+//                   },
+//                 ),
+//               ],
+//             ),
+//           );
+//         },
+//       ),
+//     ),
+//   );
+// }
 // Función para manejar Cámara y Galería
 Future<void> _obtenerImagen(ImageSource source) async {
   final ImagePicker picker = ImagePicker();
@@ -557,7 +678,7 @@ showDialog(
                   child: const Text('Cerrar')
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
+                  //style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
                   onPressed: () {
                     if (_selectedFinca == null || _selectedProducto == null) return;
                     
@@ -711,11 +832,11 @@ showDialog(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Botón editar línea.
-                              IconButton(icon: const Icon(Icons.edit), color: colorAccion, onPressed: () => _mostrarDialogoDetalle(detalle: d)),
+                              IconButton(icon: const Icon(Icons.edit), color:  AgriPalette.greenMain, onPressed: () => _mostrarDialogoDetalle(detalle: d)),
                               // Botón borrar línea.
                               IconButton(
                                 icon: const Icon(Icons.delete), 
-                                color: colorAccion, 
+                                color:  AgriPalette.greenMain, 
                                 onPressed: () => setState(() {
                                   if (d.kalbarandetalle.isEmpty) {
                                     // Si no estaba en la base de datos, lo quitamos de la lista y ya está.
