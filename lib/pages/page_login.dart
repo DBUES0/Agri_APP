@@ -15,6 +15,7 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_palette.dart';
 
 // Importamos la página de destino
 import 'page_usuario.dart';

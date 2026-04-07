@@ -5,7 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
-
+import 'package:sqflite/sqflite.dart';                        // Para ConflictAlgorithm
+import 'db_service.dart';                                     // Para que reconozca DBService
 
 class ApiService {
   // Esta es la dirección de tu servidor. 
@@ -277,4 +278,42 @@ if (response.statusCode == 200) {
   }
 }
 
+Future<List<Map<String, dynamic>>> fetchIncremental(String endpoint) async {
+  // 1. CAMBIO: Usar DBService en lugar de AI
+  final db = await DBService.instance.database;
+  final res = await db.query('sync_metadata', where: 'entidad = ?', whereArgs: [endpoint]);
+  
+  String desde = res.isNotEmpty ? res.first['ultima_sincro'] as String : '2000-01-01 00:00:00';
+
+  // 2. CAMBIO: url no existía, usamos baseUrl
+  final response = await http.get(
+    Uri.parse('$baseUrl/$endpoint?desde=$desde'), // Convertir a Uri
+    headers: await _getHeaders()
+  );
+
+  // 3. CAMBIO: response.body no tiene .isNotEmpty, se comprueba el status o el contenido
+  if (response.statusCode == 200) {
+    final List<dynamic> nuevosDatos = jsonDecode(response.body);
+    
+    if (nuevosDatos.isNotEmpty) {
+      // Guardamos en SQL (Asegúrate de tener este método en db_service.dart)
+      await DBService.instance.saveToCache(endpoint, nuevosDatos.cast<Map<String, dynamic>>());
+      
+      await db.insert('sync_metadata', 
+        {'entidad': endpoint, 'ultima_sincro': DateTime.now().toString()},
+        conflictAlgorithm: ConflictAlgorithm.replace
+      );
+    }
+  }
+  
+  // 4. Debes definir este método en ApiService o llamar a la DB directamente
+  return await _getAllFromLocal(endpoint);
+}
+
+// AÑADE ESTE MÉTODO al final de la clase ApiService para que no dé error
+Future<List<Map<String, dynamic>>> _getAllFromLocal(String tabla) async {
+  final db = await DBService.instance.database;
+  final res = await db.query('local_cache', where: 'tabla = ?', whereArgs: [tabla]);
+  return res.map((item) => jsonDecode(item['json_data'] as String) as Map<String, dynamic>).toList();
+}
 }
