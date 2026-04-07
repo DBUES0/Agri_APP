@@ -1,3 +1,4 @@
+import 'package:agriapp/services/db_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/record_albaran.dart';
@@ -199,7 +200,8 @@ Future<void> _guardarAlbaran() async {
       print("ALBARÁN COMPLETO ENVIADO AL SERVIDOR: ${albaranCompleto.toString()}");
 
       // 5. Llamada única al servidor
-      await _apiService.mergeAlbaran(albaranCompleto);
+      //await _apiService.mergeAlbaran(albaranCompleto);
+      DBService.instance.registrarPendiente(entidad: 'albaran', datos: albaranCompleto);
 
       // --- LÓGICA DE REORDENACIÓN EN MEMORIA ---
       if (detallesActivos.isNotEmpty) {

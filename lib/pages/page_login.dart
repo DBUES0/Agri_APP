@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -65,14 +67,13 @@ class _LoginPageState extends State<LoginPage> {
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', token);
+      await prefs.setString('usuario_json', jsonEncode(userData));
 
       final usuario = Usuario.fromJson(userData);
       
       // Iniciamos la carga masiva de datos
-      print('hola Antes');
       final fincas = (await _apiService.fetchListV('vfincas'))
           .map((json) => finca.fromJson(json)).toList();
-      print('hola');    
       final almacenes = (await _apiService.fetchList('tblalmacen'))
           .map((json) => Almacen.fromJson(json)).toList();
       

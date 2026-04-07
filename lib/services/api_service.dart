@@ -316,4 +316,49 @@ Future<List<Map<String, dynamic>>> _getAllFromLocal(String tabla) async {
   final res = await db.query('local_cache', where: 'tabla = ?', whereArgs: [tabla]);
   return res.map((item) => jsonDecode(item['json_data'] as String) as Map<String, dynamic>).toList();
 }
+
+Future<void> guardarAlbaranOffline(Map<String, dynamic> albaranData) async {
+  final db = await DBService.instance.database;
+
+  // 1. Lo guardamos en la caché local para que el usuario lo vea YA
+  await DBService.instance.saveToCache('albaranes', [albaranData]);
+
+  // 2. Lo anotamos en la lista de pendientes
+  await db.insert('pendientes_sincro', {
+    'entidad': 'albaran',
+    'operacion': 'INSERT',
+    'datos_json': jsonEncode(albaranData),
+    'fecha_creacion': DateTime.now().toIso8601String(),
+  });
+
+  // 3. Intentamos sincronizar en segundo plano (sin bloquear al usuario)
+  sincronizarPendientes(); 
+}
+
+Future<void> sincronizarPendientes() async {
+  final db = await DBService.instance.database;
+  
+  // Obtenemos todo lo que falta por subir
+  final List<Map<String, dynamic>> pendientes = await db.query('pendientes_sincro');
+
+  for (var item in pendientes) {
+    try {
+      final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
+      
+      // Intentamos enviar a la API
+      await postParticular('mergealbaran', datos);
+
+      // Si la API responde OK, borramos de pendientes
+      await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [item['id']]);
+      
+      print("Sincronizado con éxito: ${item['id']}");
+    } catch (e) {
+      // Si falla (por falta de red), no hacemos nada. 
+      // Se queda en la tabla para el próximo intento.
+      print("Fallo de red, se reintentará luego: $e");
+      break; // Dejamos de intentar para no saturar si no hay red
+    }
+  }
+}
+
 }

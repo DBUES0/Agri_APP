@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -14,6 +16,7 @@ import '../models/record_tipogasto.dart';
 import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
+import '../utils/ui_utils.dart';
 
 // Destino
 import 'page_usuario.dart'; // Tu DashboardPage (UsuarioPage)
@@ -36,29 +39,135 @@ class _DashboardCargaState extends State<DashboardCarga> {
     _iniciarApp();
   }
 
-  Future<void> _iniciarApp() async {
+  // Future<void> _iniciarApp() async {
+  //   try {
+  //     // 1. Verificar si tenemos token (doble comprobación)
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final String? token = prefs.getString('token');
+
+  //     // En page_carga.dart:
+  //     final String? userJson = prefs.getString('usuario_json');
+  //     if (userJson != null) {
+  //       final usuario = Usuario.fromJson(jsonDecode(userJson));
+  //       // ¡Ya tienes al usuario sin llamar a la API!
+  //     }
+
+  //     //borrar
+  //     mensajeEmergente(context, 'Token encontrado: $token', segundos: 5);
+  //     print('Token encontrado: $token');
+  //     if (token == null || token.isEmpty) {
+  //       _irAlLogin();
+  //       return;
+  //     }
+
+  //     // 2. Cargar Perfil de Usuario 
+  //     // (Asumiendo que tienes un endpoint 'perfil' o similar que use el Bearer token)
+  //     setState(() => _mensajeStatus = "Cargando perfil...");
+
+  //     // La respuesta suele venir como una lista de un solo elemento [ {datos...} ]
+  //     final response = await _apiService.fetchParticular('perfil');
+
+  //     // CAMBIO AQUÍ: Si es una lista, tomamos el primero. Si es un mapa, lo usamos directo.
+  //     final Map<String, dynamic> userData = (response is List) ? response.first : response;
+
+  //     //Comentamos esto porque usuario viene cargado de arriba 
+  //     final usuario = Usuario.fromJson(userData);
+  //     // 3. CARGA MASIVA (Copiada de tu lógica de login)
+  //     setState(() => _mensajeStatus = "Sincronizando fincas...");
+  //     final fincas = (await _apiService.fetchListV('vfincas'))
+  //         .map((json) => finca.fromJson(json)).toList();
+
+  //     setState(() => _mensajeStatus = "Cargando almacenes...");
+  //     final almacenes = (await _apiService.fetchList('tblalmacen'))
+  //         .map((json) => Almacen.fromJson(json)).toList();
+
+  //     setState(() => _mensajeStatus = "Cargando productos...");
+  //     final productos = (await _apiService.fetchParticular('productos'))
+  //         .map((json) => Producto.fromJson(json)).toList();
+
+  //     setState(() => _mensajeStatus = "Configurando maestros...");
+  //     final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
+  //         .map((json) => Tipogasto.fromJson(json)).toList();
+
+  //     final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
+  //         .map((json) => Tipodeprecio.fromJson(json)).toList();
+
+  //     final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
+  //         .map((json) => Tipooperacion.fromJson(json)).toList();
+
+  //     setState(() => _mensajeStatus = "Cargando personal...");
+  //     final trabajadores = (await _apiService.fetchList('tbltrabajador'))
+  //         .map((json) => Trabajador.fromJson(json)).toList();
+
+  //     setState(() => _mensajeStatus = "Recuperando albaranes...");
+  //     final albaranes = (await _apiService.fetchParticular('albaranes'))
+  //         .map((json) => Albaran.fromJson(json)).toList();
+
+  //     if (!mounted) return;
+
+  //     // 4. Salto al Dashboard con todos los datos
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => UsuarioPage(
+  //           usuario: usuario,
+  //           fincas: fincas,
+  //           tiposGasto: tiposGasto,
+  //           almacen: almacenes,
+  //           producto: productos,
+  //           tipodeprecio: tiposPrecio,
+  //           tipooperacion: operaciones,
+  //           trabajador: trabajadores,
+  //           albaranes: albaranes,
+  //         ),
+  //       ),
+  //     );
+
+  //   } catch (e) {
+  //     print("Error en carga automática: $e");
+  //     // Si el token falló o expiró, borramos y al login
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.remove('token');
+  //     _irAlLogin();
+  //   }
+  // }
+
+Future<void> _iniciarApp() async {
     try {
-      // 1. Verificar si tenemos token (doble comprobación)
       final prefs = await SharedPreferences.getInstance();
       final String? token = prefs.getString('token');
+
+      mensajeEmergente(context, 'token: $token', segundos: 2);
 
       if (token == null || token.isEmpty) {
         _irAlLogin();
         return;
       }
 
-      // 2. Cargar Perfil de Usuario 
-      // (Asumiendo que tienes un endpoint 'perfil' o similar que use el Bearer token)
-      setState(() => _mensajeStatus = "Cargando perfil...");
+      // 1. DEFINIMOS LA VARIABLE FUERA PARA QUE SEA ACCESIBLE DESPUÉS
+      Usuario? usuario;
 
-      // La respuesta suele venir como una lista de un solo elemento [ {datos...} ]
-      final response = await _apiService.fetchParticular('perfil');
+      // Intentamos cargar desde el "disco" (Opción A)
+      final String? userJson = prefs.getString('usuario_json');
+      
+      mensajeEmergente(context, 'Usuario: $userJson', segundos: 2);
 
-      // CAMBIO AQUÍ: Si es una lista, tomamos el primero. Si es un mapa, lo usamos directo.
-      final Map<String, dynamic> userData = (response is List) ? response.first : response;
+      if (userJson != null) {
+        setState(() => _mensajeStatus = "Recuperando sesión local...");
+        usuario = Usuario.fromJson(jsonDecode(userJson));
+      } else {
+        // Si por alguna razón no hay JSON local, lo pedimos a la API
+        setState(() => _mensajeStatus = "Cargando perfil desde servidor...");
+        final response = await _apiService.fetchParticular('perfil');
+        final Map<String, dynamic> userData = (response is List) ? response.first : response;
+        usuario = Usuario.fromJson(userData);
+        
+        // Lo guardamos para la próxima vez
+        await prefs.setString('usuario_json', jsonEncode(userData));
+      }
 
-      final usuario = Usuario.fromJson(userData);
-      // 3. CARGA MASIVA (Copiada de tu lógica de login)
+      // 2. CARGA MASIVA DE DATOS
+      // Aquí seguimos igual, descargando lo necesario para el Dashboard
       setState(() => _mensajeStatus = "Sincronizando fincas...");
       final fincas = (await _apiService.fetchListV('vfincas'))
           .map((json) => finca.fromJson(json)).toList();
@@ -91,12 +200,13 @@ class _DashboardCargaState extends State<DashboardCarga> {
 
       if (!mounted) return;
 
-      // 4. Salto al Dashboard con todos los datos
+      // 3. SALTO AL DASHBOARD
+      // Usamos 'usuario!' porque estamos seguros de que no es nulo a estas alturas
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => UsuarioPage(
-            usuario: usuario,
+            usuario: usuario!, 
             fincas: fincas,
             tiposGasto: tiposGasto,
             almacen: almacenes,
@@ -111,9 +221,6 @@ class _DashboardCargaState extends State<DashboardCarga> {
 
     } catch (e) {
       print("Error en carga automática: $e");
-      // Si el token falló o expiró, borramos y al login
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('token');
       _irAlLogin();
     }
   }

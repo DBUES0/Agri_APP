@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'api_service.dart';
+import 'sync_service.dart';
 
 class DBService {
   static final DBService instance = DBService._init();
@@ -43,6 +47,18 @@ class DBService {
         PRIMARY KEY (tabla, id)
       )
     ''');
+
+  // Tabla para registros creados/editados en el móvil que aún no están en el servidor
+  await db.execute('''
+    CREATE TABLE pendientes_sincro (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entidad TEXT,      -- 'albaran', 'gasto', etc.
+      operacion TEXT,    -- 'INSERT', 'UPDATE', 'DELETE'
+      datos_json TEXT,   -- El objeto completo en JSON
+      fecha_creacion TEXT
+    )
+  ''');
+
   }
 
   // Método para guardar una lista de objetos en la caché
@@ -67,4 +83,22 @@ class DBService {
     }
     await batch.commit(noResult: true);
   }
+
+// Metodo para guardar en la base de datos del movil los registros que se han creado o editado y que aún no se han sincronizado con el servidor, intentando sincronizar automáticamente después de guardar
+
+Future<void> registrarPendiente({
+  required String entidad, 
+  required Map<String, dynamic> datos
+}) async {
+  final db = await database;
+  await db.insert('pendientes_sincro', {
+    'entidad': entidad,
+    'operacion': 'MERGE',
+    'datos_json': jsonEncode(datos),
+    'fecha_creacion': DateTime.now().toIso8601String(),
+  });
+  
+  // Intentar sincronizar automáticamente al guardar
+  SyncService.sincronizarTodo();
+}
 }

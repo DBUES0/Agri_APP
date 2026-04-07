@@ -1,5 +1,6 @@
 import 'package:agriapp/pages/page_usuario.dart';
 import 'package:agriapp/utils/ui_utils.dart';
+import 'package:agriapp/widgets/icono_sync.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -224,6 +225,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
         // 3. ICONOS DE FUNCIÓN A LA DERECHA (se mantienen en actions)
         actions: [
+          const IconoSync(),
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sincronizar', // Ayuda al usuario
