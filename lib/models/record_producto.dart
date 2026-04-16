@@ -36,4 +36,13 @@ factory Producto.fromJson(Map<String, dynamic> json) {
     tipoproductoStr: json['tipoproducto_str'] ?? 'General',
   );
 }
+
+Map<String, dynamic> toJson() => {
+  'kproducto': kproducto,
+  'producto_str': productoStr,
+  'fecha_dtm': fecha.toIso8601String(),
+  'ktipoproducto': ktipoproducto,
+  'tipoproducto_str': tipoproductoStr,
+};
+
 }

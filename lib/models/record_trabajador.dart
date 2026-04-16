@@ -26,4 +26,12 @@ class Trabajador {
       emailStr: json['email_str'],
     );
   }
+  Map<String, dynamic> toJson() => {
+        'ktrabajador': ktrabajador,
+        'kagricultor': kagricultor,
+        'nombre_str': nombreStr,
+        'dni_str': dniStr,
+        'telefono_str': telefonoStr,
+        'email_str': emailStr,
+      };
 }

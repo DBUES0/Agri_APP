@@ -87,15 +87,37 @@ class ApiService {
     }
   }
   // 3. Endpoints especiales (como los albaranes que tienen lógica compleja)
-  Future<List<dynamic>> fetchParticular(String endpoint) async {
-    final url = Uri.parse('$baseUrl/$endpoint');
+  // Future<List<dynamic>> fetchParticular(String endpoint) async {
+  //   final url = Uri.parse('$baseUrl/$endpoint');
+  //   final response = await http.get(url, headers: await _getHeaders());
+  //   if (response.statusCode == 200) {
+  //     return jsonDecode(response.body);
+  //   } else {
+  //     throw 'Error al obtener datos de $endpoint';
+  //   }
+  // }
+Future<List<dynamic>> fetchParticular(String endpoint) async {
+  final url = Uri.parse('$baseUrl/$endpoint');
+  
+  try {
     final response = await http.get(url, headers: await _getHeaders());
+    
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final data = jsonDecode(response.body);
+      // Aprovechamos para guardar en caché siempre que haya internet
+      await DBService.instance.saveToCache(endpoint, data is List ? data.cast<Map<String, dynamic>>() : [data]);
+      return data;
     } else {
-      throw 'Error al obtener datos de $endpoint';
+      throw 'Error del servidor';
     }
+  } catch (e) {
+    // ¡AQUÍ ESTÁ EL TRUCO! 
+    // Si hay SocketException (offline), cargamos de la DB local automáticamente
+    print("Modo Offline detectado para $endpoint. Cargando de SQLite...");
+    return await DBService.instance.getAllFromLocal(endpoint);
   }
+}
+
 // En ApiService.dart añade:
 
 Future<Map<String, dynamic>> postParticular(String endpoint, Map<String, dynamic> data) async {

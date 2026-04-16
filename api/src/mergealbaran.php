@@ -13,13 +13,22 @@ function mergeAlbaran(Request $request, Response $response): Response {
     $jwt = $request->getAttribute('jwt');
     $kagricultor = $jwt->sub;
 
+    // $input = json_decode($request->getBody()->getContents(), true);
+
+    // if (!$input || !isset($input[0])) {
+    //     return jsonResponse($response, ["error" => "JSON vacío o malformado"], 400);
+    // }
+
+    // $albaran = $input[0];
     $input = json_decode($request->getBody()->getContents(), true);
 
-    if (!$input || !isset($input[0])) {
+    if (!$input) {
         return jsonResponse($response, ["error" => "JSON vacío o malformado"], 400);
     }
 
-    $albaran = $input[0];
+    // Si viene como objeto directo o como array de un elemento
+    $albaran = isset($input[0]) ? $input[0] : $input;
+
     $albaran['kagricultor'] = $kagricultor;
 
     $conn->begin_transaction();

@@ -36,6 +36,19 @@ factory Albaran.fromJson(Map<String, dynamic> json) {
               .toList() ?? [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'kalbaran': kalbaran,
+    'fecha_dtm': fecha.toIso8601String(),
+    'kalmacen': kalmacen,
+    'ktipodeprecio': ktipodeprecio,
+    'comentario_str': comentarioStr,
+    'idalbaran_str': idalbaranstr,
+    // CRITICAL: Mapeamos las listas llamando al toJson de cada hijo
+    'detalles': detalles.map((e) => e.toJson()).toList(),
+    'archivos': archivos.map((e) => e.toJson()).toList(),
+  };
+
 }
 
 class AlbaranDetalle {
@@ -86,6 +99,23 @@ factory AlbaranDetalle.fromJson(Map<String, dynamic> json) {
       kfinca: json['kfinca'] ?? '',
     );
   }
+
+  
+  Map<String, dynamic> toJson() => {
+    'kalbarandetalle': kalbarandetalle,
+    'kalbaran': kalbaran,
+    'linea_int': linea,
+    'kg_float': kg,
+    'numeropallets_int': pallets,
+    'numerocajas_int': cajas,
+    'precio_flt': precio,
+    'kproducto': kproducto,
+    'comentario_str': comentario,
+    'eliminado_bit': eliminado,
+    'fechaeliminacion_dtm': fechaeliminacion,
+    'kagricultor': kagricultor,
+    'kfinca': kfinca,
+  };
 }
 
 class Archivo {
@@ -137,5 +167,21 @@ factory Archivo.fromJson(Map<String, dynamic> json) {
     );
   }
 
+
+Map<String, dynamic> toJson() => {
+    'karchivos': karchivos,
+    'kagricultor': kagricultor,
+    'kuuid': kuuid,
+    'orden_int': orden,
+    'fecha_dtm': fecha.toIso8601String(),
+    'formato_str': formato,
+    'sizemb_flt': sizemb,
+    'comentario_str': comentario,
+    'nombrearchivo_str': nombrearchivo,
+    'rutacompleta_str': rutacompleta,
+    'campo1_str': campo1,
+    'tipo_str': tipo,
+    'eliminado_bit': eliminado,
+  };
   
 }

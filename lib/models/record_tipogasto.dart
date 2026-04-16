@@ -28,4 +28,13 @@ class Tipogasto {
       kagricultor: json['kagricultor'],
     );
   }
+  Map<String, dynamic> toJson() => {
+        'ktipogasto': ktipogasto,
+        'tipogasto_str': tipogastoStr,
+        'descripcion_str': descripcionStr,
+        'fecha_dtm': fecha.toIso8601String(),
+        'fechamodificacion_dtm':
+            fechaModificacion?.toIso8601String(), // Puede ser null
+        'kagricultor': kagricultor,
+      };
 }

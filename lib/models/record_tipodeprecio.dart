@@ -23,4 +23,11 @@ class Tipodeprecio {
       kagricultor: json['kagricultor'],
     );
   }
+  Map<String, dynamic> toJson() => {
+        'ktipodeprecio': ktipodeprecio,
+        'tipodeprecio_str': tipodeprecioStr,
+        'descripcion_str': descripcionStr,
+        'fecha_dtm': fecha.toIso8601String(),
+        'kagricultor': kagricultor,
+      };
 }

@@ -23,4 +23,11 @@ class Almacen {
       kagricultor: json['kagricultor'],
     );
   }
+  Map<String, dynamic> toJson() => {
+    'kalmacen': kalmacen,
+    'nombre_str': nombreStr,
+    'ktipoalbaran': ktipoalbaran, // <--- INCLUIDO EN toJson
+    'fecha_dtm': fecha.toIso8601String(),
+    'kagricultor': kagricultor,
+  };
 }

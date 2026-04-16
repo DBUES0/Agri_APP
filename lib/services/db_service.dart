@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'api_service.dart';
 import 'sync_service.dart';
 
 class DBService {
@@ -76,7 +75,8 @@ class DBService {
         {
           'tabla': tabla,
           'id': item[idKey].toString(),
-          'json_data': item.toString(), // O jsonEncode(item)
+          // 'json_data': item.toString(), 
+          'json_data': jsonEncode(item),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -101,4 +101,15 @@ Future<void> registrarPendiente({
   // Intentar sincronizar automáticamente al guardar
   SyncService.sincronizarTodo();
 }
+
+Future<List<Map<String, dynamic>>> getAllFromLocal(String tabla) async {
+  final db = await database;
+  // Consultamos la tabla de caché filtrando por el nombre de la entidad
+  final res = await db.query('local_cache', where: 'tabla = ?', whereArgs: [tabla]);
+  
+  // Convertimos el String JSON que guardamos en la DB de vuelta a un Mapa de Dart
+  return res.map((item) => jsonDecode(item['json_data'] as String) as Map<String, dynamic>).toList();
+}
+
+
 }

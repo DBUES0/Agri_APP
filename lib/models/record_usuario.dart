@@ -46,4 +46,17 @@ class Usuario {
       tipoUsuario: json['ktipodeusuario'] ?? '',
     );
   }
+  Map<String, dynamic> toJson() => {
+        'nombre_str': nombre,
+        'apellidos_str': apellidos,
+        'dni_str': dni,
+        'direccion_str': direccion,
+        'email_str': email,
+        'telefono_str': telefono,
+        'validado_bit': validado ? 1 : 0,
+        'bloqueado_bit': bloqueado ? 1 : 0,
+        'numintentos_int': intentos,
+        'ultimointentologin_dtm': ultimoIntento,
+        'ktipodeusuario': tipoUsuario,
+      };
 }

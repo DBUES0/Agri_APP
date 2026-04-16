@@ -28,4 +28,13 @@ class Tipooperacion {
       kagricultor: json['kagricultor'],
     );
   }
+  Map<String, dynamic> toJson() => {
+        'ktipooperacion': ktipooperacion,
+        'tipooperacion_str': tipooperacionStr,
+        'descripcion_str': descripcionStr,
+        'fecha_dtm': fecha.toIso8601String(),
+        'fechamodificacion_dtm':
+            fechaModificacion?.toIso8601String(), // Puede ser null
+        'kagricultor': kagricultor,
+      };
 }

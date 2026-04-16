@@ -1,9 +1,7 @@
-import 'package:agriapp/services/api_service.dart';
 import 'package:agriapp/services/sync_service.dart';
 import 'package:flutter/material.dart'; // <--- ESTO ARREGLA CASI TODOS LOS ERRORES
 import 'package:sqflite/sqflite.dart';   // Para Sqflite.firstIntValue
 import '../services/db_service.dart';
-import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
 
 

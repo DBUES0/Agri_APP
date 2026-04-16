@@ -44,6 +44,21 @@ class finca {
       fechaultimouso: DateTime.tryParse(json['fechaultimouso_dtm'] ?? '') ?? DateTime.now(),
     );
   }
+
+Map<String, dynamic> toJson() => {
+    'kfinca': kfinca,
+    'kfincapadre': kfincapadre,
+    'nombre_str': nombreStr,
+    'descripcion_str': descripcionStr,
+    'kagricultor': kagricultor,
+    'ubicacion_str': ubicacionStr,
+    'aream2_float': aream2Flt,    
+    'campo1_str': campo1Str,
+    'campo2_str': campo2Str,
+    'fecha': fecha.toIso8601String(),
+    'fechaultimouso_dtm': fechaultimouso.toIso8601String(), 
+    // Asegúrate de poner AQUÍ todos los campos que tiene el modelo
+  };
   @override
   String toString() {
     return 'Finca(nombre: $nombreStr, descripcion: $descripcionStr, ubicación: $ubicacionStr, área: $aream2Flt m2)';
