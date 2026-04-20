@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:agriapp/main.dart'; // Asegúrate de que el nombre coincide con tu pubspec.yaml
+// Asegúrate de que el nombre coincide con tu pubspec.yaml
 
 void main() {
   testWidgets('App load smoke test', (WidgetTester tester) async {

@@ -40,12 +40,14 @@ class SyncService {
           } else {
               break; // Algo salió mal en el servidor, paramos la cola
           }
-        } catch (e) {
-          // Si falla un registro (por red), hacemos BREAK. 
-          // No intentamos el siguiente porque probablemente tampoco haya red.
-          print("Error sincronizando ID ${item['id']}: $e");
-          break; 
-        }
+          } catch (e) {
+            if (e.toString().contains("Expired token") || e.toString().contains("Token inválido")) {
+              print("SESIÓN EXPIRADA. El usuario debe volver a loguearse.");
+              // Aquí podrías lanzar una notificación o usar un EventBus para cerrar sesión
+              break; 
+            }
+            break; 
+          }
       }
     } finally {
       _isSyncing = false; // Liberamos el "cerrojo" siempre, pase lo que pase

@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:sqflite/sqflite.dart';                        // Para ConflictAlgorithm
 import 'db_service.dart';                                     // Para que reconozca DBService
+import 'package:flutter/material.dart'; // <--- ARREGLA CONTEXT, NAVIGATOR Y MATERIALPAGEROUTE
+import '../pages/page_login.dart';    // <--- ARREGLA EL ERROR DE LOGINPAGE
 
 class ApiService {
   // Esta es la dirección de tu servidor. 
@@ -327,9 +329,23 @@ Future<List<Map<String, dynamic>>> fetchIncremental(String endpoint) async {
       );
     }
   }
+    if (response.statusCode == 401) {
+      // El servidor dice que el token no vale. 
+      // 1. Borrar datos locales
+      // 2. Redirigir al Login
+      throw 'Expired token'; // Lanzamos este texto exacto para que SyncService lo cace
+      // throw "Sesión caducada"; 
+    }
   
+  if (response.statusCode == 200 || response.statusCode == 201) {
+    //return jsonDecode(response.body);
+    return await _getAllFromLocal(endpoint);
+  }
+  
+  throw 'Error en $endpoint: ${response.body}';
+
   // 4. Debes definir este método en ApiService o llamar a la DB directamente
-  return await _getAllFromLocal(endpoint);
+  
 }
 
 // AÑADE ESTE MÉTODO al final de la clase ApiService para que no dé error
@@ -380,6 +396,22 @@ Future<void> sincronizarPendientes() async {
       print("Fallo de red, se reintentará luego: $e");
       break; // Dejamos de intentar para no saturar si no hay red
     }
+  }
+}
+
+// En ApiService.dart o donde gestiones la navegación global
+Future<void> cerrarSesion(BuildContext context) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('token');
+  await prefs.remove('usuario_json');
+  
+  // Limpiamos la pila de navegación y mandamos al Login
+  if (context.mounted) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
   }
 }
 

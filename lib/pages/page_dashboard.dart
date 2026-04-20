@@ -1,4 +1,5 @@
 import 'package:agriapp/pages/page_usuario.dart';
+import 'package:agriapp/services/sync_service.dart';
 import 'package:agriapp/utils/ui_utils.dart';
 import 'package:agriapp/widgets/icono_sync.dart';
 import 'package:flutter/material.dart';
@@ -79,9 +80,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
   /// [logout] Borra el token de seguridad del teléfono y vuelve atrás.
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    Navigator.of(context).pop();
+    // final prefs = await SharedPreferences.getInstance();
+    // await prefs.remove('token');
+    // Navigator.of(context).pop();
+    
+  try {
+    await SyncService.sincronizarTodo();
+  } catch (e) {
+    if (e.toString().contains("Expired token")) {
+      // Si el servicio nos dice que el token murió, cerramos sesión
+      if (context.mounted) {
+        await ApiService().cerrarSesion(context);
+      }
+    }
+  }
+
   }
 
   /// Ejecuta todas las actualizaciones de datos a la vez.
