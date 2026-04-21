@@ -1,56 +1,87 @@
+import 'dart:async';
 import 'dart:convert';
+import 'db_service.dart';
+import 'api_service.dart';
 
-import 'package:agriapp/services/db_service.dart';
-
-import '../services/api_service.dart';
-// Clase para evitar que haya dos sincronizaciones a la vez (que podría pasar si el usuario pulsa varias veces en "Guardar" sin red)
 class SyncService {
+  // Flag para evitar que se ejecuten dos sincronizaciones al mismo tiempo
   static bool _isSyncing = false;
+  
+  // El temporizador que buscará datos pendientes periódicamente
+  static Timer? _syncTimer;
 
+  /// Inicia el trabajador en segundo plano. 
+  /// Se recomienda llamarlo una sola vez al arrancar la app (en main.dart o page_carga.dart).
+  static void startAutoSync() {
+    if (_syncTimer != null) return; // Si ya está corriendo, no hacemos nada
+
+    print("--- TRABAJADOR DE SINCRONIZACIÓN INICIADO ---");
+    _syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      // Cada 30 segundos intentamos sincronizar
+      await sincronizarTodo();
+    });
+  }
+
+  /// Detiene el trabajador (útil si el usuario cierra sesión)
+  static void stopAutoSync() {
+    _syncTimer?.cancel();
+    _syncTimer = null;
+  }
+
+  /// El método principal que recorre la cola de pendientes y los envía a la API
   static Future<void> sincronizarTodo() async {
-    // Si ya hay una sincronización en marcha, no hacemos nada
     if (_isSyncing) return;
     
     _isSyncing = true;
     final db = await DBService.instance.database;
-    
+
     try {
+      // 1. Obtenemos los pendientes por orden de creación
       final List<Map<String, dynamic>> pendientes = await db.query(
-        'pendientes_sincro', 
-        orderBy: 'fecha_creacion ASC' // Importante: enviar en orden
+        'pendientes_sincro',
+        orderBy: 'fecha_creacion ASC',
       );
+
+      if (pendientes.isEmpty) {
+        _isSyncing = false;
+        return;
+      }
+
+      print("Intentando sincronizar ${pendientes.length} registros...");
 
       for (var item in pendientes) {
         try {
           final String entidad = item['entidad'];
           final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
-          
-          // --- LÓGICA GENÉRICA ---
-          // Dependiendo de la 'entidad', decidimos a qué endpoint enviar
-          String endpoint = '';
-          if (entidad == 'albaran') endpoint = 'mergealbaran';
-          if (entidad == 'gasto') endpoint = 'gastos/guardar'; // Ejemplo
-          
-          // Dentro del bucle for en SyncService
+
+          // Definimos el endpoint según el tipo de dato
+          String endpoint = (entidad == 'albaran') ? 'mergealbaran' : 'gastos/guardar';
+
+          // 2. Enviamos a la API
+          // Nota: postParticular ya debería manejar la lógica de errores 401
           final response = await ApiService().postParticular(endpoint, datos);
 
-          // Si tu API devuelve un mapa con 'success' o similar:
+          // 3. Si no hay error en la respuesta, borramos de la base de datos local
           if (response.containsKey('error') == false) {
-              await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [item['id']]);
+            await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [item['id']]);
+            print("ID ${item['id']} ($entidad) sincronizado y borrado de la cola.");
           } else {
-              break; // Algo salió mal en el servidor, paramos la cola
+            print("Error del servidor para ID ${item['id']}: ${response['error']}");
+            break; // Paramos el bucle si el servidor rechaza el dato
           }
-          } catch (e) {
-            if (e.toString().contains("Expired token") || e.toString().contains("Token inválido")) {
-              print("SESIÓN EXPIRADA. El usuario debe volver a loguearse.");
-              // Aquí podrías lanzar una notificación o usar un EventBus para cerrar sesión
-              break; 
-            }
-            break; 
+        } catch (e) {
+          // Manejo de Token expirado o errores de red
+          if (e.toString().contains("Expired token") || e.toString().contains("401")) {
+             print("Sincronización abortada: Sesión caducada.");
+             // Aquí no podemos usar 'context' porque no es un widget. 
+             // Pero el error se propagará y la UI lo manejará.
           }
+          print("Error de red o conexión: $e");
+          break; // Si falla la red, dejamos de intentar con el resto por ahora
+        }
       }
     } finally {
-      _isSyncing = false; // Liberamos el "cerrojo" siempre, pase lo que pase
+      _isSyncing = false;
     }
   }
 }

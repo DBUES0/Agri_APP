@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:agriapp/services/sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -351,6 +352,9 @@ Future<void> _iniciarApp() async {
       albaranes = local.map((json) => Albaran.fromJson(json)).toList();
     }
 
+  //iniciamos el proceso de sincronización automática en segundo plano (cada 3 segundos)
+  SyncService.startAutoSync();
+
     if (!mounted) return;
 
     // --- 4. SALTO AL DASHBOARD ---
@@ -370,6 +374,7 @@ Future<void> _iniciarApp() async {
         ),
       ),
     );
+
 
   } catch (e) {
     print("Error crítico en carga: $e");

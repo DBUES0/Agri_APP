@@ -114,6 +114,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
 
+  Future<void> _superRefresh() async {
+    // 1. Primero intentamos subir lo que haya pendiente
+    await SyncService.sincronizarTodo();
+    
+    // 2. Después bajamos lo último del servidor
+    await _refreshAlbaranes();
+    
+    // 3. El IconoSync se actualizará solo por su Stream interno
+    setState(() {}); 
+  }
 
   // Los métodos _refreshGastos y _refreshOperaciones están preparados 
   // para cuando crees sus respectivos endpoints en tu servidor PHP.
@@ -242,7 +252,7 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sincronizar', // Ayuda al usuario
-            onPressed: _refreshAll,
+            onPressed: _superRefresh, // _refreshAll,
           ),
           IconButton(
             icon: const Icon(Icons.edit),
