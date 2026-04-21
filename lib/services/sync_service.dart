@@ -53,7 +53,29 @@ class SyncService {
         try {
           final String entidad = item['entidad'];
           final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
+          final List<dynamic> archivos = datos['archivos'] ?? [];
 
+          for (var archivo in archivos) {
+            // Si la ruta no empieza por "http", es que es un archivo local pendiente de subir
+            if (archivo['rutacompleta_str'] != null && !archivo['rutacompleta_str'].startsWith('http')) {
+              
+              String? nuevoUuidServidor = await ApiService().subirArchivoMultipart(
+                archivo['rutacompleta_str'], 
+                datos['kalbaran'], // El kuuid que espera tu PHP
+                'ALBARAN'          // El tipo que espera tu PHP
+              );
+
+              if (nuevoUuidServidor != null) {
+                // Actualizamos el objeto local con el ID real del servidor
+                archivo['karchivos'] = nuevoUuidServidor;
+                // Opcional: podrías marcarlo como 'ya subido'
+              }
+            }
+          }
+          
+          // Una vez procesados los archivos, enviamos el Albarán completo
+          await ApiService().postParticular('mergealbaran', datos);
+          
           // Definimos el endpoint según el tipo de dato
           String endpoint = (entidad == 'albaran') ? 'mergealbaran' : 'gastos/guardar';
 

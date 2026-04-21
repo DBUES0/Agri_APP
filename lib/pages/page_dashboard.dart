@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:agriapp/pages/page_usuario.dart';
+import 'package:agriapp/services/db_service.dart';
 import 'package:agriapp/services/sync_service.dart';
 import 'package:agriapp/utils/ui_utils.dart';
 import 'package:agriapp/widgets/icono_sync.dart';
@@ -77,6 +80,29 @@ class _DashboardPageState extends State<DashboardPage> {
     // Al iniciar, cargamos los albaranes que nos pasaron desde el login.
     _albaranes = widget.albaranes;
   }
+
+Stream<List<Albaran>> _getAlbaranesStream() async* {
+  while (true) {
+    // 1. Sacamos los albaranes que bajamos de la API (caché)
+    final localData = await DBService.instance.getAllFromLocal('albaranes');
+    List<Albaran> albaranesAPI = localData.map((json) => Albaran.fromJson(json)).toList();
+
+    // 2. Sacamos los que están en la cola de pendientes (los nuevos offline)
+    final db = await DBService.instance.database;
+    final resPendientes = await db.query('pendientes_sincro', where: 'entidad = ?', whereArgs: ['albaran']);
+    
+    List<Albaran> albaranesPendientes = resPendientes.map((item) {
+      //final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
+      final Map<String, dynamic> datos = jsonDecode(item['datos_json'] as String);
+      return Albaran.fromJson(datos);
+    }).toList();
+
+    // 3. Los unimos (poniendo los pendientes los primeros para que se vean arriba)
+    yield [...albaranesPendientes, ...albaranesAPI];
+
+    await Future.delayed(const Duration(seconds: 5)); // Refrescamos cada 5 seg
+  }
+}
 
   /// [logout] Borra el token de seguridad del teléfono y vuelve atrás.
   Future<void> _logout() async {
@@ -270,8 +296,18 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(16),
         children: [
           // Sección principal de Albaranes (con cálculos de kilos)
-          _buildAlbaranesSection(),
-          
+          //_buildAlbaranesSection(),
+          StreamBuilder<List<Albaran>>(
+              stream: _getAlbaranesStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                
+                // Actualizamos nuestra lista interna para que el resto de funciones sigan funcionando
+                _albaranes = snapshot.data!; 
+                
+                return _buildAlbaranesSection(); // Tu método actual ahora usará la lista combinada
+              },
+            ),
           // Secciones secundarias (TODO: Implementar sus páginas específicas)
           _buildSection('Gastos', onAdd: () {}),
           _buildSection('Operaciones', onAdd: () {}),
@@ -379,7 +415,21 @@ class _DashboardPageState extends State<DashboardPage> {
                         padding: const EdgeInsets.only(left: 16.0),
                         child: Column(
                           children: albaranMap.entries.map((aEntry) {
-                            final albaran = _albaranes.firstWhere((a) => a.kalbaran == aEntry.key);
+                            //final albaran = _albaranes.firstWhere((a) => a.kalbaran == aEntry.key);
+                            // Buscamos el albarán, pero con un "Plan B" por si no existe
+                            final albaran = _albaranes.firstWhere(
+                              (a) => a.kalbaran == aEntry.key,
+                              orElse: () => Albaran(
+                                kalbaran: '', // Marcamos como vacío
+                                fecha: DateTime.now(),
+                                kalmacen: '',
+                                detalles: [],
+                                archivos: [],
+                              ),
+                            );
+
+                            // Si el albarán devuelto es el "vacío", saltamos este paso y no pintamos nada
+                            if (albaran.kalbaran.isEmpty) return const SizedBox.shrink();
                             final albaranKg = aEntry.value.fold<double>(0, (sum, d) => sum + d.kg);
                             final expanded = _expandedAlbaranes[aEntry.key] ?? false;
 

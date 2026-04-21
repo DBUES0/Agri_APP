@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -415,4 +416,42 @@ Future<void> cerrarSesion(BuildContext context) async {
   }
 }
 
+Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo) async {
+  try {
+    final url = Uri.parse('$baseUrl/subirArchivo'); // Ajusta a tu ruta real
+    
+    // Creamos la petición Multipart
+    var request = http.MultipartRequest('POST', url);
+    
+    // 1. Añadimos los headers (Token de seguridad)
+    request.headers.addAll(await _getHeaders());
+
+    // 2. Añadimos los campos de texto que tu PHP espera
+    request.fields['kuuid'] = kuuidPadre;
+    request.fields['tipo'] = tipo;
+
+    // 3. Añadimos el archivo físico
+    request.files.add(await http.MultipartFile.fromPath(
+      'archivo', // Coincide con $uploadedFiles['archivo'] en tu PHP
+      pathLocal,
+      filename: basename(pathLocal),
+    ));
+
+    // Enviamos
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      final resBody = jsonDecode(response.body);
+      print("Archivo subido con éxito: ${resBody['uuid']}");
+      return resBody['uuid']; // Devolvemos el karchivos (ID) que generó el servidor
+    } else {
+      print("Error subiendo archivo: ${response.body}");
+      return null;
+    }
+  } catch (e) {
+    print("Excepción en subida de archivo: $e");
+    return null;
+  }
+}
 }
