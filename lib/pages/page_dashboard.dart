@@ -6,7 +6,6 @@ import 'package:agriapp/services/sync_service.dart';
 import 'package:agriapp/utils/ui_utils.dart';
 import 'package:agriapp/widgets/icono_sync.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'package:agriapp/utils/app_theme.dart';
 import 'package:agriapp/utils/app_palette.dart';
@@ -74,12 +73,26 @@ class _DashboardPageState extends State<DashboardPage> {
   static const Color colorEliminar = Colors.red;
   static const Color colorFondo = Colors.white;
 
-  @override
-  void initState() {
-    super.initState();
-    // Al iniciar, cargamos los albaranes que nos pasaron desde el login.
-    _albaranes = widget.albaranes;
-  }
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   // Al iniciar, cargamos los albaranes que nos pasaron desde el login.
+  //   _albaranes = widget.albaranes;
+  // }
+
+@override
+void initState() {
+  super.initState();
+  _albaranes = widget.albaranes;
+
+  // --- ESCUCHAMOS AL TRABAJADOR DE FONDO ---
+  SyncService.syncStream.listen((finalizadoOk) {
+    if (finalizadoOk && mounted) {
+      print("SyncService avisa: ¡Cola vacía o registros subidos! Refrescando UI...");
+      _refreshAlbaranes(); // Esto actualiza la lista visual con lo que ya está en el servidor
+    }
+  });
+}
 
 Stream<List<Albaran>> _getAlbaranesStream() async* {
   while (true) {
@@ -105,23 +118,99 @@ Stream<List<Albaran>> _getAlbaranesStream() async* {
 }
 
   /// [logout] Borra el token de seguridad del teléfono y vuelve atrás.
-  Future<void> _logout() async {
-    // final prefs = await SharedPreferences.getInstance();
-    // await prefs.remove('token');
-    // Navigator.of(context).pop();
+  // Future<void> _logout() async {
+  //   // final prefs = await SharedPreferences.getInstance();
+  //   // await prefs.remove('token');
+  //   // Navigator.of(context).pop();
     
-  try {
-    await SyncService.sincronizarTodo();
-  } catch (e) {
-    if (e.toString().contains("Expired token")) {
-      // Si el servicio nos dice que el token murió, cerramos sesión
-      if (context.mounted) {
-        await ApiService().cerrarSesion(context);
+  // try {
+  //   await SyncService.sincronizarTodo();
+  // } catch (e) {
+  //   if (e.toString().contains("Expired token")) {
+  //     // Si el servicio nos dice que el token murió, cerramos sesión
+  //     if (context.mounted) {
+  //       await ApiService().cerrarSesion(context);
+  //     }
+  //   }
+  // }
+
+  // }
+
+
+//   Future<void> _logout() async {
+//   // Mostramos un diálogo de confirmación (opcional pero recomendado)
+//   bool? confirmar = await showDialog(
+//     context: context,
+//     builder: (context) => AlertDialog(
+//       title: const Text("Cerrar Sesión"),
+//       content: const Text("¿Estás seguro de que quieres salir?"),
+//       actions: [
+//         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancelar")),
+//         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Salir", style: TextStyle(color: Colors.red))),
+//       ],
+//     ),
+//   );
+
+//   if (confirmar == true) {
+//     await _apiService.cerrarSesion(context);
+//   }
+// }
+
+Future<void> _logout() async {
+  bool? confirmar = await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      title: Text("Cerrar Sesión", 
+        style: TextStyle(color: AgriPalette.greenMain, fontWeight: FontWeight.bold)
+      ),
+      content: const Text("¿Estás seguro de que quieres salir de AgriAPP?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text("CANCELAR", style: TextStyle(color: AgriPalette.greyMain)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AgriPalette.greenMain,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text("SALIR", style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmar == true) {
+    try {
+      // Intentamos una última sincro antes de irnos
+      await SyncService.sincronizarTodo();
+      if (mounted) await _apiService.cerrarSesion(context);
+    } catch (e) {
+      // Si falla por token, cerramos sesión igualmente
+      if (e.toString().contains("Expired token") && mounted) {
+        await _apiService.cerrarSesion(context);
       }
     }
   }
+}
 
+// Y para la sincronización manual o automática, usamos tu lógica de detección:
+Future<void> _intentarSincroManual() async {
+  try {
+    mensajeEmergente(context, "Comprobando conexión...", tipo: 'info');
+    await SyncService.sincronizarTodo();
+  } catch (e) {
+    if (e.toString().contains("Expired token") || e.toString().contains("401")) {
+      mensajeEmergente(context, "Tu sesión ha caducado. Identifícate de nuevo.", tipo: 'error');
+      if (mounted) await _apiService.cerrarSesion(context);
+    } else {
+      mensajeEmergente(context, "Sin conexión o error de red", tipo: 'error');
+    }
   }
+}
+
 
   /// Ejecuta todas las actualizaciones de datos a la vez.
   Future<void> _refreshAll() async {

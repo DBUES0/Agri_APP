@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -400,21 +399,45 @@ Future<void> sincronizarPendientes() async {
   }
 }
 
-// En ApiService.dart o donde gestiones la navegación global
+// // En ApiService.dart o donde gestiones la navegación global
+// Future<void> cerrarSesion(BuildContext context) async {
+//   final prefs = await SharedPreferences.getInstance();
+//   await prefs.remove('token');
+//   await prefs.remove('usuario_json');
+  
+//   // Limpiamos la pila de navegación y mandamos al Login
+//   if (context.mounted) {
+//     Navigator.pushAndRemoveUntil(
+//       context,
+//       MaterialPageRoute(builder: (context) => const LoginPage()),
+//       (route) => false,
+//     );
+//   }
+// }
+
+// En lib/services/api_service.dart
+
 Future<void> cerrarSesion(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
+  
+  // 1. Limpiamos TODA la persistencia local relacionada con la sesión
   await prefs.remove('token');
   await prefs.remove('usuario_json');
   
-  // Limpiamos la pila de navegación y mandamos al Login
-  if (context.mounted) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
-    );
-  }
+  // Opcional: Detener el motor de autosync si lo tienes activo
+  // SyncService.stopAutoSync(); 
+
+  if (!context.mounted) return;
+
+  // 2. Navegación "limpia": Borra todo el historial de pantallas y va al Login
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => const LoginPage()),
+    (route) => false, // Esto hace que no se pueda volver al Dashboard con el botón atrás
+  );
 }
+
+
 
 Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo) async {
   try {
@@ -454,4 +477,7 @@ Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, Strin
     return null;
   }
 }
+
+
+
 }

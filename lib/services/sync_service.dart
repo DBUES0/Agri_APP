@@ -4,39 +4,40 @@ import 'db_service.dart';
 import 'api_service.dart';
 
 class SyncService {
-  // Flag para evitar que se ejecuten dos sincronizaciones al mismo tiempo
   static bool _isSyncing = false;
-  
-  // El temporizador que buscará datos pendientes periódicamente
   static Timer? _syncTimer;
 
-  /// Inicia el trabajador en segundo plano. 
-  /// Se recomienda llamarlo una sola vez al arrancar la app (en main.dart o page_carga.dart).
-  static void startAutoSync() {
-    if (_syncTimer != null) return; // Si ya está corriendo, no hacemos nada
+  // El StreamController que avisa a la UI. 
+  // .broadcast() permite que varios widgets escuchen a la vez.
+  static final _syncController = StreamController<bool>.broadcast();
+  static Stream<bool> get syncStream => _syncController.stream;
 
+  /// Enciende el motor de sincronización automática
+  static void startAutoSync() {
+    if (_syncTimer != null) return;
     print("--- TRABAJADOR DE SINCRONIZACIÓN INICIADO ---");
     _syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      // Cada 30 segundos intentamos sincronizar
       await sincronizarTodo();
     });
   }
 
-  /// Detiene el trabajador (útil si el usuario cierra sesión)
+  /// Apaga el motor
   static void stopAutoSync() {
     _syncTimer?.cancel();
     _syncTimer = null;
+    print("--- TRABAJADOR DE SINCRONIZACIÓN DETENIDO ---");
   }
 
-  /// El método principal que recorre la cola de pendientes y los envía a la API
+  /// MÉTODO MAESTRO DE SINCRONIZACIÓN
   static Future<void> sincronizarTodo() async {
     if (_isSyncing) return;
-    
     _isSyncing = true;
+    
     final db = await DBService.instance.database;
+    bool huboCambiosEnEstaSesion = false; // <--- NUESTRO SEMÁFORO
 
     try {
-      // 1. Obtenemos los pendientes por orden de creación
+      // 1. Buscamos todos los pendientes
       final List<Map<String, dynamic>> pendientes = await db.query(
         'pendientes_sincro',
         orderBy: 'fecha_creacion ASC',
@@ -47,61 +48,63 @@ class SyncService {
         return;
       }
 
-      print("Intentando sincronizar ${pendientes.length} registros...");
+      print("Iniciando subida de bloque: ${pendientes.length} registros.");
 
+      // 2. EMPEZAMOS EL BUCLE DE SUBIDA
       for (var item in pendientes) {
         try {
           final String entidad = item['entidad'];
-          final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
-          final List<dynamic> archivos = datos['archivos'] ?? [];
-
-          for (var archivo in archivos) {
-            // Si la ruta no empieza por "http", es que es un archivo local pendiente de subir
-            if (archivo['rutacompleta_str'] != null && !archivo['rutacompleta_str'].startsWith('http')) {
-              
-              String? nuevoUuidServidor = await ApiService().subirArchivoMultipart(
-                archivo['rutacompleta_str'], 
-                datos['kalbaran'], // El kuuid que espera tu PHP
-                'ALBARAN'          // El tipo que espera tu PHP
-              );
-
-              if (nuevoUuidServidor != null) {
-                // Actualizamos el objeto local con el ID real del servidor
-                archivo['karchivos'] = nuevoUuidServidor;
-                // Opcional: podrías marcarlo como 'ya subido'
+          final Map<String, dynamic> datos = jsonDecode(item['datos_json'] as String);
+          
+          // A. SUBIDA DE ARCHIVOS (Si es albarán)
+          if (entidad == 'albaran' && datos['archivos'] != null) {
+            final List<dynamic> archivos = datos['archivos'];
+            for (var archivo in archivos) {
+              // Si es ruta local, lo subimos
+              if (archivo['rutacompleta_str'] != null && !archivo['rutacompleta_str'].startsWith('http')) {
+                String? nuevoUuid = await ApiService().subirArchivoMultipart(
+                  archivo['rutacompleta_str'], 
+                  datos['kalbaran'], 
+                  'ALBARAN'
+                );
+                if (nuevoUuid != null) archivo['karchivos'] = nuevoUuid;
               }
             }
           }
           
-          // Una vez procesados los archivos, enviamos el Albarán completo
-          await ApiService().postParticular('mergealbaran', datos);
-          
-          // Definimos el endpoint según el tipo de dato
+          // B. ENVIAR DATOS A LA API
           String endpoint = (entidad == 'albaran') ? 'mergealbaran' : 'gastos/guardar';
-
-          // 2. Enviamos a la API
-          // Nota: postParticular ya debería manejar la lógica de errores 401
           final response = await ApiService().postParticular(endpoint, datos);
 
-          // 3. Si no hay error en la respuesta, borramos de la base de datos local
+          // C. SI EL SERVIDOR RESPONDE OK
           if (response.containsKey('error') == false) {
             await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [item['id']]);
-            print("ID ${item['id']} ($entidad) sincronizado y borrado de la cola.");
+            huboCambiosEnEstaSesion = true; // <--- Marcamos que algo se ha movido
+            print("Registro ${item['id']} sincronizado con éxito.");
           } else {
-            print("Error del servidor para ID ${item['id']}: ${response['error']}");
-            break; // Paramos el bucle si el servidor rechaza el dato
+            print("El servidor rechazó el registro ${item['id']}: ${response['error']}");
+            // Si hay un error de validación, paramos para no bloquear el bucle con errores
+            break; 
           }
         } catch (e) {
-          // Manejo de Token expirado o errores de red
+          // GESTIÓN DE SEGURIDAD (TOKEN)
           if (e.toString().contains("Expired token") || e.toString().contains("401")) {
-             print("Sincronización abortada: Sesión caducada.");
-             // Aquí no podemos usar 'context' porque no es un widget. 
-             // Pero el error se propagará y la UI lo manejará.
+             print("ERROR CRÍTICO: Token caducado en SyncService.");
+             rethrow; // Lanzamos el error para que la UI cierre la sesión
           }
-          print("Error de red o conexión: $e");
-          break; // Si falla la red, dejamos de intentar con el resto por ahora
+          print("Fallo de red para el registro ${item['id']}: $e");
+          break; // Si falla la red, salimos del bucle y esperamos a los próximos 30s
         }
       }
+
+      // --- 3. FINAL DEL PROCESO ---
+      // Solo si el semáforo está en true (hubo cambios), avisamos a la UI.
+      // Esto ocurre una sola vez, después de procesar toda la lista.
+      if (huboCambiosEnEstaSesion) {
+        print("Sincronización de bloque terminada. Avisando al Dashboard...");
+        _syncController.add(true); 
+      }
+
     } finally {
       _isSyncing = false;
     }
