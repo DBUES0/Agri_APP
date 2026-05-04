@@ -75,6 +75,7 @@ function generateUUID() {
 }
 
 
+//function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
 function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
 {
     $uploadedFiles = $request->getUploadedFiles();
@@ -88,8 +89,11 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
     }
 
     $file = $uploadedFiles['archivo'];
-    $kuuid = $parsedBody['kuuid'] ?? null;
+    $kuuid = $parsedBody['kuuid'] ?? null; // ID del Albarán/Gasto
     $tipo = $parsedBody['tipo'] ?? null;
+
+    // --- NUEVO: Capturamos el ID del archivo generado por el móvil ---
+    $karchivos_cliente = $parsedBody['karchivos'] ?? null;
 
     if (!$kuuid || !$tipo) {
         return jsonResponse($response, ["error" => "Faltan parámetros kuuid o tipo"], 400);
@@ -103,20 +107,33 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
     try {
         $conn = conectarDB($servername, $username, $password, $dbname);
 
-        $stmt = $conn->prepare("INSERT INTO tblArchivos 
-                              (kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
-                              VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $null = null;
-        // Los tipos son: string, string, blob (se maneja con send_long_data), string, float, string, string
-        $stmt->bind_param("ssbsdss", $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
-        $stmt->send_long_data(2, $fileContent);
+        // Modificamos la consulta para incluir karchivos si el cliente lo envía
+        if ($karchivos_cliente) {
+            $sql = "INSERT INTO tblArchivos 
+                    (karchivos, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $null = null;
+            $stmt->bind_param("ssbsbdss", $karchivos_cliente, $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
+        } else {
+            $sql = "INSERT INTO tblArchivos 
+                    (kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $null = null;
+            $stmt->bind_param("ssbsdss", $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
+        }
+
+        $stmt->send_long_data($karchivos_cliente ? 3 : 2, $fileContent);
         
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        $fileId = $conn->insert_id;
-        $stmt->close();
+        // El UUID final será el que envió el cliente o el generado por el sistema
+        $uuidFinal = $karchivos_cliente ?: $conn->insert_id; 
+        $stmt->close();       
+
 
         // Obtener el ID del archivo recién insertado
         $uuidStmt = $conn->prepare("SELECT karchivos FROM tblArchivos WHERE kuuid = ? AND kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
@@ -153,7 +170,7 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
         $stmt->close();
 
         $conn->close();
-        return jsonResponse($response, ["mensaje" => "Archivo subido correctamente", "uuid" => $uuid], 200);
+        return jsonResponse($response, ["mensaje" => "Archivo subido correctamente", "uuid" => $uuidFinal], 200);
         
     } catch (Exception $e) {
         error_log("Error al subir archivo: " . $e->getMessage());

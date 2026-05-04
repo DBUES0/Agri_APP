@@ -13,8 +13,8 @@ servers:
     description: Servidor local de desarrollo
   - url: https://apitest.bueso.duckdns.org
     description: Servidor de test
-  - url: http://192.168.1.221
-    description: Servidor local de test
+  - url: https://api.bueso.online
+    description: Cloudflare
 
 
 security:
@@ -561,6 +561,10 @@ paths:
                   type: string
                   format: binary
                   description: Archivo a subir
+                karchivos_cliente:
+                  type: string
+                  description: UUID opcional enviado por el cliente para el archivo
+                  example: 123e4567-e89b-12d3-a456-426614174000
                 kuuid:
                   type: string
                   description: Identificador único del archivo

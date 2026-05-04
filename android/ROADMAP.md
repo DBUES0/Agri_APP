@@ -1,22 +1,22 @@
 # Hoja de Ruta - AgriAPP
 
-Este documento detalla las próximas tareas de desarrollo para la aplicación.
+Este documento detalla las tareas de desarrollo para la aplicación.
 
-## Tareas Pendientes (Orden de Prioridad Recomendado)
+## Tareas Completadas ✅
+* **Persistencia y Caché Local**: Implementación de base de datos local con SQLite.
+* **Auto-Login**: Persistencia de token para evitar logins repetidos.
+* **Modo Offline / Sincronización (Básico)**: Implementación de la "Cola de Pendientes" (Outbox) para registros de texto.
 
-1.  **[ ] Persistencia y Caché Local (Auto-Login)**
-    * Implementar base de datos local (SQLite o Hive) para guardar información y no depender siempre de la API al abrir la App.
-    * Guardar token para evitar login repetido.
+## Tareas Pendientes (Prioridad Actualizada)
 
-2.  **[ ] Motor de Agrupación Dinámico (AgriAPP-Cerebro)**
-    * Desarrollar la lógica para que la visualización de albaranes/gastos acepte criterios de agrupación variables (fecha, nave, cultivo, producto).
-
-3.  **[ ] Módulo de GASTOS**
-    * Implementar la funcionalidad de Gastos reutilizando la lógica de Albaranes (herencia de una clase genérica `RegistroAgricola`).
-
-4.  **[ ] Modo Offline / Sincronización**
-    * Implementar "Cola de Pendientes" (Outbox) para guardar cambios localmente cuando no hay red y sincronizar automáticamente al recuperar conexión.
-
-5.  **[ ] Signup / Bot de Telegram**
-    * Crear pantalla de registro de nuevo usuario con validación por correo.
-    * Desarrollar Bot de Telegram para 2FA y notificaciones críticas.
+1. **[ ] Gestión de Archivos Offline y en Segundo Plano**
+    * Refactorizar subida para usar UUIDs generados en cliente.
+    * Asegurar persistencia de archivos binarios en el dispositivo antes de la sincro.
+2. **[ ] Módulo de GASTOS**
+    * Implementar funcionalidad de Gastos en `tblFincaGastos`.
+    * Reutilizar la lógica de sincronización de albaranes.
+3. **[ ] Motor de Agrupación Dinámico (AgriAPP-Cerebro)**
+    * Lógica para agrupar visualmente por fecha, finca o producto.
+4. **[ ] Signup / Bot de Telegram**
+    * Registro de nuevos usuarios en `tblAgricultores`.
+    * Integración con Telegram para notificaciones.

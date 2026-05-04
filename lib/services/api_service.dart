@@ -439,45 +439,79 @@ Future<void> cerrarSesion(BuildContext context) async {
 
 
 
-Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo) async {
-  try {
-    final url = Uri.parse('$baseUrl/subirArchivo'); // Ajusta a tu ruta real
+// Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo) async {
+//   try {
+//     final url = Uri.parse('$baseUrl/subirArchivo'); // Ajusta a tu ruta real
     
-    // Creamos la petición Multipart
+//     // Creamos la petición Multipart
+//     var request = http.MultipartRequest('POST', url);
+    
+//     // 1. Añadimos los headers (Token de seguridad)
+//     request.headers.addAll(await _getHeaders());
+
+//     // 2. Añadimos los campos de texto que tu PHP espera
+//     request.fields['kuuid'] = kuuidPadre;
+//     request.fields['tipo'] = tipo;
+
+//     // 3. Añadimos el archivo físico
+//     request.files.add(await http.MultipartFile.fromPath(
+//       'archivo', // Coincide con $uploadedFiles['archivo'] en tu PHP
+//       pathLocal,
+//       filename: basename(pathLocal),
+//     ));
+
+//     // Enviamos
+//     var streamedResponse = await request.send();
+//     var response = await http.Response.fromStream(streamedResponse);
+
+//     if (response.statusCode == 200) {
+//       final resBody = jsonDecode(response.body);
+//       print("Archivo subido con éxito: ${resBody['uuid']}");
+//       return resBody['uuid']; // Devolvemos el karchivos (ID) que generó el servidor
+//     } else {
+//       print("Error subiendo archivo: ${response.body}");
+//       return null;
+//     }
+//   } catch (e) {
+//     print("Excepción en subida de archivo: $e");
+//     return null;
+//   }
+// En lib/services/api_service.dart
+
+Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo, {String? karchivoLocal}) async {
+  try {
+    final url = Uri.parse('$baseUrl/subirArchivo');
     var request = http.MultipartRequest('POST', url);
     
-    // 1. Añadimos los headers (Token de seguridad)
     request.headers.addAll(await _getHeaders());
 
-    // 2. Añadimos los campos de texto que tu PHP espera
-    request.fields['kuuid'] = kuuidPadre;
-    request.fields['tipo'] = tipo;
+    // Enviamos los campos que PHP espera
+    request.fields['kuuid'] = kuuidPadre; // ID del Albarán[cite: 1, 2]
+    request.fields['tipo'] = tipo;        // 'ALBARAN'[cite: 1, 2]
+    
+    // --- NUEVO: Enviamos el ID del archivo para que la API lo respete ---
+    if (karchivoLocal != null) {
+      request.fields['karchivos'] = karchivoLocal;
+    }
 
-    // 3. Añadimos el archivo físico
     request.files.add(await http.MultipartFile.fromPath(
-      'archivo', // Coincide con $uploadedFiles['archivo'] en tu PHP
+      'archivo',
       pathLocal,
       filename: basename(pathLocal),
     ));
 
-    // Enviamos
-    var streamedResponse = await request.send();
-    var response = await http.Response.fromStream(streamedResponse);
+    var response = await http.Response.fromStream(await request.send());
 
     if (response.statusCode == 200) {
       final resBody = jsonDecode(response.body);
-      print("Archivo subido con éxito: ${resBody['uuid']}");
-      return resBody['uuid']; // Devolvemos el karchivos (ID) que generó el servidor
-    } else {
-      print("Error subiendo archivo: ${response.body}");
-      return null;
+      return resBody['uuid']; 
     }
+    return null;
   } catch (e) {
-    print("Excepción en subida de archivo: $e");
+    print("Error: $e");
     return null;
   }
 }
 
-
-
 }
+
