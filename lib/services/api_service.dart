@@ -504,7 +504,8 @@ Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, Strin
 
     if (response.statusCode == 200) {
       final resBody = jsonDecode(response.body);
-      return resBody['uuid']; 
+      // Usamos .toString() para asegurar que nunca sea un int
+      return resBody['uuid']?.toString(); 
     }
     return null;
   } catch (e) {

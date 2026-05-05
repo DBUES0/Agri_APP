@@ -27,7 +27,7 @@ git commit -m "%msg%"
 
 echo.
 echo [4/4] Subiendo a GitHub...
-git push
+git push origin main
 
 echo.
 echo [OK] ¡Ahora si que si! Version Release subida sin fantasmas.
