@@ -10,6 +10,8 @@ import 'db_service.dart';                                     // Para que recono
 import 'package:flutter/material.dart'; // <--- ARREGLA CONTEXT, NAVIGATOR Y MATERIALPAGEROUTE
 import '../pages/page_login.dart';    // <--- ARREGLA EL ERROR DE LOGINPAGE
 
+
+
 class ApiService {
   // Esta es la dirección de tu servidor. 
   // Al tenerla aquí, si un día cambia, solo la editas en un sitio.
@@ -146,6 +148,7 @@ Future<Map<String, dynamic>> uploadFile({
   required String filePath,
   required String kuuid,
   required String tipo,
+  String? karchivos, // <--- AÑADE ESTO
 }) async {
   final prefs = await SharedPreferences.getInstance();
   final token = prefs.getString('token');
@@ -155,6 +158,8 @@ Future<Map<String, dynamic>> uploadFile({
     'POST',
     Uri.parse('$baseUrl/archivo'),
   );
+  
+  if (karchivos != null) request.fields['karchivos'] = karchivos;
 
   // Añadimos las cabeceras de seguridad
   request.headers['Authorization'] = 'Bearer $token';
@@ -478,41 +483,89 @@ Future<void> cerrarSesion(BuildContext context) async {
 //   }
 // En lib/services/api_service.dart
 
-Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo, {String? karchivoLocal}) async {
-  try {
-    final url = Uri.parse('$baseUrl/subirArchivo');
-    var request = http.MultipartRequest('POST', url);
+// Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo, {String? karchivoLocal}) async {
+//   try {
+//     final url = Uri.parse('$baseUrl/subirArchivo');
+//     var request = http.MultipartRequest('POST', url);
     
-    request.headers.addAll(await _getHeaders());
+//     request.headers.addAll(await _getHeaders());
 
-    // Enviamos los campos que PHP espera
-    request.fields['kuuid'] = kuuidPadre; // ID del Albarán[cite: 1, 2]
-    request.fields['tipo'] = tipo;        // 'ALBARAN'[cite: 1, 2]
+//     // Enviamos los campos que PHP espera
+//     request.fields['kuuid'] = kuuidPadre; // ID del Albarán[cite: 1, 2]
+//     request.fields['tipo'] = tipo;        // 'ALBARAN'[cite: 1, 2]
     
-    // --- NUEVO: Enviamos el ID del archivo para que la API lo respete ---
+//     // --- NUEVO: Enviamos el ID del archivo para que la API lo respete ---
+//     if (karchivoLocal != null) {
+//       request.fields['karchivos'] = karchivoLocal;
+//     }
+
+//     request.files.add(await http.MultipartFile.fromPath(
+//       'archivo',
+//       pathLocal,
+//       filename: basename(pathLocal),
+//     ));
+
+//     var response = await http.Response.fromStream(await request.send());
+
+//     if (response.statusCode == 200) {
+//       final resBody = jsonDecode(response.body);
+//       // Usamos .toString() para asegurar que nunca sea un int
+//       return resBody['uuid']?.toString(); 
+//     }
+//     return null;
+//   } catch (e) {
+//     print("Error: $e");
+//     return null;
+//   }
+// }
+
+Future<String?> subirArchivoMultipart(
+  String pathLocal, 
+  String kuuidPadre, 
+  String tipo, 
+  {String? karchivoLocal}
+) async {
+  try {
+    // CORRECCIÓN 1: Evitar el doble /api/api
+    // Si baseUrl ya termina en /api, no lo pongas aquí.
+    final String cleanUrl = baseUrl.endsWith('/api') ? '$baseUrl/archivo' : '$baseUrl/api/archivo';
+    var request = http.MultipartRequest('POST', Uri.parse(cleanUrl));
+    
+    // CORRECCIÓN 2: Headers manuales para asegurar el Bearer Token
+    final String? token = await _getToken(); // Tu función que saca el JWT de las SharedPreferences
+    request.headers['Authorization'] = 'Bearer $token';
+    request.headers['Accept'] = 'application/json';
+
+    request.fields['kuuid'] = kuuidPadre;
+    request.fields['tipo'] = tipo;
     if (karchivoLocal != null) {
       request.fields['karchivos'] = karchivoLocal;
     }
 
-    request.files.add(await http.MultipartFile.fromPath(
-      'archivo',
-      pathLocal,
-      filename: basename(pathLocal),
-    ));
+    // Validación de archivo local
+    final file = File(pathLocal);
+    if (!await file.exists()) {
+      print("INFO: Saltando archivo no local o inexistente: $pathLocal");
+      return null;
+    }
 
-    var response = await http.Response.fromStream(await request.send());
+    request.files.add(await http.MultipartFile.fromPath('archivo', pathLocal));
+
+    print("Subiendo binario a: $cleanUrl");
+    var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+    var response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode == 200) {
       final resBody = jsonDecode(response.body);
-      // Usamos .toString() para asegurar que nunca sea un int
-      return resBody['uuid']?.toString(); 
+      return resBody['uuid']?.toString();
+    } else {
+      print("ERROR SERVIDOR (${response.statusCode}): ${response.body}");
+      return null;
     }
-    return null;
   } catch (e) {
-    print("Error: $e");
+    print("EXCEPCIÓN SUBIDA: $e");
     return null;
   }
 }
-
 }
 

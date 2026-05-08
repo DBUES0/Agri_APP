@@ -11,7 +11,8 @@ import 'package:uuid/uuid.dart'; // Importa la librería
 import 'package:image_picker/image_picker.dart'; // Para tomar fotos con la cámara o elegir de la galería
 import '../utils/ui_utils.dart';
 import '../utils/app_palette.dart';
-
+import 'dart:io'; // Para usar la clase File
+import 'package:path_provider/path_provider.dart'; // Para getApplicationDocumentsDirectory
 
 
 /// [PageAlbaran] es una pantalla de tipo 'StatefulWidget'. 
@@ -51,7 +52,6 @@ class _PageAlbaranState extends State<PageAlbaran> {
   final ApiService _apiService = ApiService();
 
   // Color principal que elegiste para que los botones de 'Añadir' y 'Borrar' sean iguales.
-  static const Color colorAccion = Colors.green; 
 
   // Variables que guardan lo que el usuario va eligiendo en la pantalla.
   late DateTime _fecha;               // Fecha seleccionada.
@@ -173,10 +173,24 @@ Future<void> _guardarAlbaran() async {
           'formato_str': a.formato,
           'nombrearchivo_str': a.nombrearchivo,
           'tipo_str': a.tipo,
-          'eliminado_bit': a.eliminado,           // Enviamos la fecha de eliminación si el bit es 1
+          'eliminado_bit': a.eliminado,
           'comentario_str': a.comentario ?? "",
+          'rutacompleta_str': a.rutacompleta, // <--- ¡ESTA LÍNEA ES VITAL!
         };
       }).toList();
+      // final listaArchivos = _archivos.map((a) {
+      //   return {
+      //     'karchivos': a.karchivos,
+      //     'kuuid': a.kuuid,
+      //     'orden_int': a.orden,
+      //     'fecha_dtm': a.fecha.toIso8601String(),
+      //     'formato_str': a.formato,
+      //     'nombrearchivo_str': a.nombrearchivo,
+      //     'tipo_str': a.tipo,
+      //     'eliminado_bit': a.eliminado,           // Enviamos la fecha de eliminación si el bit es 1
+      //     'comentario_str': a.comentario ?? "",
+      //   };
+      // }).toList();
 
       // 4. Crear el objeto ALBARÁN completo (Cabecera + Hijos)
       // En page_albaran.dart, dentro de _guardarAlbaran()
@@ -286,7 +300,7 @@ Future<void> _mostrarOAnadirArchivos() async {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Divider(color: AgriPalette.greyMain.withOpacity(0.2)),
+                Divider(color: AgriPalette.greyMain..withValues(alpha: 0.2)),
                 
                 // LISTADO DE ARCHIVOS
                 if (archivosVisibles.isEmpty)
@@ -392,31 +406,69 @@ Future<void> _obtenerImagen(ImageSource source) async {
 }
 
 // Función interna para centralizar la subida (usando la librería uuid)
-Future<void> _procesarYSubirArchivo(String path, String name) async {
-  String newUuid = const Uuid().v4(); // Genera UUID real
+// Future<void> _procesarYSubirArchivo(String path, String name) async {
+//   String newUuid = const Uuid().v4(); // Genera UUID real
+//   try {
+//     final response = await _apiService.uploadFile(
+//       filePath: path,
+//       kuuid: newUuid,
+//       tipo: 'albaran_foto',
+//     );
+
+//     setState(() {
+//       _archivos.add(Archivo(
+//         karchivos: response['uuid'], 
+//         nombrearchivo: name,
+//         kagricultor: '', kuuid: newUuid, orden: _archivos.length + 1,
+//         fecha: DateTime.now(), formato: name.split('.').last,
+//         tipo: 'albaran_foto',
+//       ));
+//     });
+//     mensajeEmergente(context, 'Archivo subido correctamente');
+//   } catch (e) {
+//     mensajeEmergente(context, 'Error al subir: $e');
+//   }
+// }
+
+
+Future<void> _procesarYSubirArchivo(String pathOriginal, String name) async {
   try {
-    final response = await _apiService.uploadFile(
-      filePath: path,
-      kuuid: newUuid,
-      tipo: 'albaran_foto',
-    );
+    // 1. Generar UUID local inmediatamente
+    String newUuid = const Uuid().v4();
+
+    // 2. Mover a carpeta permanente (Soluciona error de getApplicationDocumentsDirectory y File)
+    final directory = await getApplicationDocumentsDirectory();
+    final String extension = name.split('.').last;
+    final String nuevoPath = '${directory.path}/$newUuid.$extension';
+    
+    // Copiamos el archivo de la caché a documentos de la App
+    await File(pathOriginal).copy(nuevoPath);
+
+    if (!mounted) return;
 
     setState(() {
+      // 3. Añadimos a la lista local con los parámetros REQUERIDOS por tu modelo
       _archivos.add(Archivo(
-        karchivos: response['uuid'], 
+        karchivos: newUuid,
+        kuuid: widget.albaran?.kalbaran ?? '', 
+        //kagricultor: widget.albaran?.kagricultor ?? '', // Requerido
+        //kagricultor: '', // El servidor lo rellenará usando el JWT
+        kagricultor: widget.fincas.isNotEmpty ? widget.fincas.first.kagricultor : '',
         nombrearchivo: name,
-        kagricultor: '', kuuid: newUuid, orden: _archivos.length + 1,
-        fecha: DateTime.now(), formato: name.split('.').last,
-        tipo: 'albaran_foto',
+        fecha: DateTime.now(),
+        formato: extension.toUpperCase(),
+        tipo: 'ALBARAN',
+        rutacompleta: nuevoPath, 
+        orden: _archivos.length + 1, // Requerido
+        // sincronizado: 0, // Eliminado para evitar error 'undefined_named_parameter'
       ));
     });
-    mensajeEmergente(context, 'Archivo subido correctamente');
+
+    mensajeEmergente(context, 'Imagen adjuntada localmente');
   } catch (e) {
-    mensajeEmergente(context, 'Error al subir: $e');
+    mensajeEmergente(context, 'Error al procesar imagen: $e', tipo: 'error');
   }
 }
-
-//COSA1 FIN
 
 Future<void> _seleccionarYSubirArchivo() async {
   // 1. El usuario elige el archivo
