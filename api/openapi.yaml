@@ -557,17 +557,17 @@ paths:
             schema:
               type: object
               properties:
+                karchivos:
+                  type: string
+                  description: Optional. UUID del archivo.
+                  example: 123e4567-e89b-12d3-a456-426614174000
                 archivo:
                   type: string
                   format: binary
                   description: Archivo a subir
-                karchivos_cliente:
-                  type: string
-                  description: UUID opcional enviado por el cliente para el archivo
-                  example: 123e4567-e89b-12d3-a456-426614174000
                 kuuid:
                   type: string
-                  description: Identificador único del archivo
+                  description: Id con el que se relaciona el archivo que estamos subiendo (tblalbaran, tblgastos, etc)
                   example: 123e4567-e89b-12d3-a456-426614174000
                 tipo:
                   type: string

@@ -96,27 +96,30 @@ void initState() {
 
 Stream<List<Albaran>> _getAlbaranesStream() async* {
   while (true) {
-    // 1. Sacamos los albaranes que bajamos de la API (caché)
+    // 1. Albaranes de la caché (API)
     final localData = await DBService.instance.getAllFromLocal('albaranes');
     List<Albaran> albaranesAPI = localData.map((json) => Albaran.fromJson(json)).toList();
 
-    // 2. Sacamos los que están en la cola de pendientes (los nuevos offline)
+    // 2. Albaranes pendientes de subir (Offline)
     final db = await DBService.instance.database;
     final resPendientes = await db.query('pendientes_sincro', where: 'entidad = ?', whereArgs: ['albaran']);
     
     List<Albaran> albaranesPendientes = resPendientes.map((item) {
-      //final Map<String, dynamic> datos = jsonDecode(item['datos_json']);
       final Map<String, dynamic> datos = jsonDecode(item['datos_json'] as String);
       return Albaran.fromJson(datos);
     }).toList();
 
-    // 3. Los unimos (poniendo los pendientes los primeros para que se vean arriba)
-    yield [...albaranesPendientes, ...albaranesAPI];
+    // --- PASO 3 MODIFICADO: Unir y ORDENAR ---
+    List<Albaran> listaTotal = [...albaranesPendientes, ...albaranesAPI];
+    
+    // Ordenamos: b.fecha.compareTo(a.fecha) para que el más reciente esté ARRIBA
+    listaTotal.sort((a, b) => b.fecha.compareTo(a.fecha));
 
-    await Future.delayed(const Duration(seconds: 5)); // Refrescamos cada 5 seg
+    yield listaTotal;
+
+    await Future.delayed(const Duration(seconds: 5));
   }
 }
-
   /// [logout] Borra el token de seguridad del teléfono y vuelve atrás.
   // Future<void> _logout() async {
   //   // final prefs = await SharedPreferences.getInstance();
@@ -526,8 +529,11 @@ Future<void> _intentarSincroManual() async {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ListTile(
-                                  title: Text('${albaran.fecha.day}/${albaran.fecha.month}/${albaran.fecha.year} - ${albaranKg.toStringAsFixed(0)} kg', style:  Theme.of(context).textTheme.bodyLarge,),
-                                  trailing: Row(
+                                  title: Text(
+                                            '${albaran.fecha.day.toString().padLeft(2, '0')}/${albaran.fecha.month.toString().padLeft(2, '0')}/${albaran.fecha.year} - ${albaranKg.toStringAsFixed(0)} kg', 
+                                            style: Theme.of(context).textTheme.bodyLarge,
+                                          ),
+                                    trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(icon: const Icon(Icons.edit),  color: AgriPalette.greenMain, onPressed: () => _goToAlbaran(albaran: albaran)),

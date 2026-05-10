@@ -317,7 +317,8 @@ function mergeAlbaran(Request $request, Response $response): Response {
             $stmt->close();
         }
 
-        // 4. ARCHIVOS
+       // --------------------------------------------------
+// 4. ARCHIVOS (mergealbaran.php)
         if (isset($albaran["archivos"]) && is_array($albaran["archivos"])) {
             foreach ($albaran["archivos"] as $archivo) {
                 $stmt = $conn->prepare("SELECT COUNT(*) FROM tblArchivos WHERE karchivos = ?");
@@ -327,39 +328,24 @@ function mergeAlbaran(Request $request, Response $response): Response {
                 $stmt->fetch();
                 $stmt->close();
 
+                
                 if ($aExists > 0) {
-                    // CORRECCIÓN: Vinculamos el kalbaran al campo kcampo1
+                // Comprobamos si la ruta que viene del móvil es una ruta local de Android
+                // Si contiene "data/user", NO actualizamos el campo rutacompleta_str
+                $esRutaMovil = strpos($archivo["rutacompleta_str"], 'data/user') !== false;
+
+                if ($esRutaMovil || $archivo["rutacompleta_str"] == "ALREADY_UPLOADED") {
+                    // UPDATE sin tocar la ruta (para no romper el NAS)
                     $sql = "UPDATE tblArchivos SET kuuid=?, eliminado_bit=?, fechaeliminacion_dtm=?, comentario_str=? WHERE karchivos=? AND kagricultor=?";
                     $stmt = $conn->prepare($sql);
-                    // 6 parámetros: s, i, s, s, s, s
-                    $stmt->bind_param(
-                        "sissss", 
-                        $albaran["kalbaran"], 
-                        $archivo["eliminado_bit"], 
-                        $archivo["fechaeliminacion_dtm"], 
-                        $archivo["comentario_str"], 
-                        $archivo["karchivos"], 
-                        $kagricultor
-                    );
+                    $stmt->bind_param("sissss", $albaran["kalbaran"], $archivo["eliminado_bit"], $archivo["fechaeliminacion_dtm"], $archivo["comentario_str"], $archivo["karchivos"], $kagricultor);
                 } else {
-                    $sql = "INSERT INTO tblArchivos (karchivos, kagricultor, kuuid, orden_int, fecha_dtm, formato_str, nombrearchivo_str, tipo_str, eliminado_bit, comentario_str) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    // Si no es ruta de móvil, dejamos que actualice normal
+                    $sql = "UPDATE tblArchivos SET kuuid=?, rutacompleta_str=?, eliminado_bit=?, fechaeliminacion_dtm=?, comentario_str=? WHERE karchivos=? AND kagricultor=?";
                     $stmt = $conn->prepare($sql);
-                    // 11 parámetros: s, s, s, i, s, s, s, s, s, i, s
-                    $stmt->bind_param(
-                        "sssisssssis", 
-                        $archivo["karchivos"], 
-                        $kagricultor, 
-                        $albaran["kalbaran"], // Vinculamos el kalbaran al campo kuuid  
-                        $archivo["orden_int"], 
-                        $archivo["fecha_dtm"], 
-                        $archivo["formato_str"], 
-                        $archivo["nombrearchivo_str"], 
-                        $archivo["tipo_str"], 
-                        //$archivo["kcampo1"], 
-                        $archivo["eliminado_bit"], 
-                        $archivo["comentario_str"]
-                    );
+                    $stmt->bind_param("ssissss", $albaran["kalbaran"], $archivo["rutacompleta_str"], $archivo["eliminado_bit"], $archivo["fechaeliminacion_dtm"], $archivo["comentario_str"], $archivo["karchivos"], $kagricultor);
                 }
+            }
                 $stmt->execute();
                 $stmt->close();
             }

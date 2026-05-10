@@ -19,11 +19,12 @@ function jsonResponse(Response $response, $data, int $status = 200): Response {
 }
 
 // Conexión a la base de datos desde variables de entorno
-function conectarDB() {
-    $servername = $_ENV['DB_HOST'];
-    $username   = $_ENV['DB_USER'];
-    $password   = $_ENV['DB_PASS'];
-    $dbname     = $_ENV['DB_NAME'];
+function conectarDB($servername = null, $username = null, $password = null, $dbname = null) {
+    // Si no vienen parámetros, usa las variables de entorno (como ya tenías)
+    $servername = $servername ?? $_ENV['DB_HOST'];
+    $username   = $username   ?? $_ENV['DB_USER'];
+    $password   = $password   ?? $_ENV['DB_PASS'];
+    $dbname     = $dbname     ?? $_ENV['DB_NAME'];
 
     $conn = new mysqli($servername, $username, $password, $dbname);
     if ($conn->connect_error) {
@@ -76,7 +77,7 @@ function generateUUID() {
 
 
 //function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
-function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
+function subirArchivov1(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
 {
     $uploadedFiles = $request->getUploadedFiles();
     $parsedBody = $request->getParsedBody();
@@ -89,11 +90,8 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
     }
 
     $file = $uploadedFiles['archivo'];
-    $kuuid = $parsedBody['kuuid'] ?? null; // ID del Albarán/Gasto
+    $kuuid = $parsedBody['kuuid'] ?? null;
     $tipo = $parsedBody['tipo'] ?? null;
-
-    // --- NUEVO: Capturamos el ID del archivo generado por el móvil ---
-    $karchivos_cliente = $parsedBody['karchivos'] ?? null;
 
     if (!$kuuid || !$tipo) {
         return jsonResponse($response, ["error" => "Faltan parámetros kuuid o tipo"], 400);
@@ -107,33 +105,20 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
     try {
         $conn = conectarDB($servername, $username, $password, $dbname);
 
-        // Modificamos la consulta para incluir karchivos si el cliente lo envía
-        if ($karchivos_cliente) {
-            $sql = "INSERT INTO tblArchivos 
-                    (karchivos, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $conn->prepare($sql);
-            $null = null;
-            $stmt->bind_param("ssbsbdss", $karchivos_cliente, $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
-        } else {
-            $sql = "INSERT INTO tblArchivos 
-                    (kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $conn->prepare($sql);
-            $null = null;
-            $stmt->bind_param("ssbsdss", $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
-        }
-
-        $stmt->send_long_data($karchivos_cliente ? 3 : 2, $fileContent);
+        $stmt = $conn->prepare("INSERT INTO tblArchivos 
+                              (kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, kagricultor) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $null = null;
+        // Los tipos son: string, string, blob (se maneja con send_long_data), string, float, string, string
+        $stmt->bind_param("ssbsdss", $kuuid, $tipo, $null, $format, $sizeMB, $filename, $kagricultor);
+        $stmt->send_long_data(2, $fileContent);
         
         if (!$stmt->execute()) {
             throw new Exception("Error al ejecutar la consulta: " . $stmt->error);
         }
         
-        // El UUID final será el que envió el cliente o el generado por el sistema
-        $uuidFinal = $karchivos_cliente ?: $conn->insert_id; 
-        $stmt->close();       
-
+        $fileId = $conn->insert_id;
+        $stmt->close();
 
         // Obtener el ID del archivo recién insertado
         $uuidStmt = $conn->prepare("SELECT karchivos FROM tblArchivos WHERE kuuid = ? AND kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
@@ -170,7 +155,7 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
         $stmt->close();
 
         $conn->close();
-        return jsonResponse($response, ["mensaje" => "Archivo subido correctamente", "uuid" => $uuidFinal], 200);
+        return jsonResponse($response, ["mensaje" => "Archivo subido correctamente", "uuid" => $uuid], 200);
         
     } catch (Exception $e) {
         error_log("Error al subir archivo: " . $e->getMessage());
@@ -178,3 +163,320 @@ function subirArchivo(Request $request, Response $response, $servername, $userna
     }
 }
 
+/**
+ * Procesa la subida de archivos vinculándolos a un registro (Albarán, Gasto, etc.)
+ * Soporta la recepción de UUIDs generados por el cliente para sincronización offline.
+ */
+// function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
+// {
+//     $uploadedFiles = $request->getUploadedFiles();
+//     $parsedBody = $request->getParsedBody();
+
+//     $jwt = $request->getAttribute('jwt');
+//     $kagricultor = $jwt->sub;
+    
+//     if (!isset($uploadedFiles['archivo'])) {
+//         return jsonResponse($response, ["error" => "No se ha recibido ningún archivo"], 400);
+//     }
+
+//     $file = $uploadedFiles['archivo'];
+//     $kuuidPadre = $parsedBody['kuuid'] ?? null;
+//     $tipo = $parsedBody['tipo'] ?? null;
+//     $karchivos_cliente = $parsedBody['karchivos'] ?? null; 
+
+//     if (!$kuuidPadre || !$tipo) {
+//         return jsonResponse($response, ["error" => "Parámetros kuuid o tipo no proporcionados"], 400);
+//     }
+
+//     // --- CORRECCIÓN 1: Definir idFinal PRIMERO ---
+//     // 1. Aseguramos el ID y la extensión
+//     $idFinal = $karchivos_cliente ?: generarUUIDv4(); 
+//     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+//     $finalPath = rtrim($uploadDir, '/') . '/' . $idFinal . '.' . $extension;
+
+//     try {
+//         $conn = conectarDB($servername, $username, $password, $dbname);
+
+//         // ERROR AQUÍ: Cuenta bien las columnas (9) y los placeholders (9)
+//         // 1.karchivos, 2.kagricultor, 3.kuuid, 4.tipo_str, 5.archivo_bin, 6.formato_str, 7.sizemb_flt, 8.nombrearchivo_str, 9.rutacompleta_str
+//         $sql = "INSERT INTO tblArchivos 
+//                 (karchivos, kagricultor, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, rutacompleta_str) 
+//                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        
+//         $stmt = $conn->prepare($sql);
+//         $null = null; 
+        
+//         // CORRECCIÓN: "ssssbsdss" -> 9 letras para 9 parámetros
+//         // s=string, b=blob, d=double
+//         $stmt->bind_param("ssssbsdss", 
+//             $idFinal,           // 1
+//             $kagricultor,       // 2
+//             $kuuidPadre,        // 3
+//             $tipo,              // 4
+//             $null,              // 5 (BLOB placeholder)
+//             $format,            // 6
+//             $sizeMB,            // 7
+//             $filename,          // 8
+//             $finalPath          // 9
+//         );
+
+//         $stmt->send_long_data(4, $fileContent); // El 4 corresponde al campo archivo_bin
+        
+//         if (!$stmt->execute()) {
+//             throw new Exception("Error ejecución SQL: " . $stmt->error);
+//         }
+        
+//         $stmt->close();
+//         $conn->close();
+
+//         // Guardar físicamente en el NAS
+//         file_put_contents($finalPath, $fileContent);
+
+//         return jsonResponse($response, [
+//             "mensaje" => "Sincronizado", 
+//             "uuid" => (string)$idFinal 
+//         ], 200);
+        
+//     } catch (Exception $e) {
+//         return jsonResponse($response, ["error" => $e->getMessage()], 500);
+//     }
+// }
+
+//este medio va
+// function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
+// {
+//     $uploadedFiles = $request->getUploadedFiles();
+//     $parsedBody = $request->getParsedBody();
+
+//     $jwt = $request->getAttribute('jwt');
+//     $kagricultor = $jwt->sub;
+    
+//     if (!isset($uploadedFiles['archivo'])) {
+//         return jsonResponse($response, ["error" => "No se ha recibido ningún archivo"], 400);
+//     }
+
+//     $file = $uploadedFiles['archivo'];
+//     $kuuidPadre = $parsedBody['kuuid'] ?? null;
+//     $tipo = $parsedBody['tipo'] ?? null;
+//     $karchivos_cliente = $parsedBody['karchivos'] ?? null; 
+
+//     if (!$kuuidPadre || !$tipo) {
+//         return jsonResponse($response, ["error" => "Parámetros kuuid o tipo no proporcionados"], 400);
+//     }
+
+//     // --- CORRECCIÓN 1: Definir variables del archivo ---
+//     $filename = $file->getClientFilename();
+//     $format = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+//     $sizeMB = round($file->getSize() / 1048576, 2);
+//     $fileContent = $file->getStream()->getContents(); // Obtenemos el binario real
+
+//     $idFinal = $karchivos_cliente ?: generarUUIDv4(); 
+//     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+//     $finalPath = rtrim($uploadDir, '/') . '/' . $idFinal . '.' . $extension;
+
+//     try {
+//         $conn = conectarDB($servername, $username, $password, $dbname);
+
+//         // --- CORRECCIÓN 2: ON DUPLICATE KEY UPDATE ---
+//         // Si la fila ya existe (creada por mergealbaran), actualizamos el binario y la ruta NAS
+//         $sql = "INSERT INTO tblArchivos 
+//                 (karchivos, kagricultor, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, rutacompleta_str) 
+//                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+//                 ON DUPLICATE KEY UPDATE 
+//                     archivo_bin = VALUES(archivo_bin), 
+//                     rutacompleta_str = VALUES(rutacompleta_str),
+//                     sizemb_flt = VALUES(sizemb_flt),
+//                     formato_str = VALUES(formato_str)";
+        
+//         $stmt = $conn->prepare($sql);
+//         $null = null; 
+        
+//         // "ssssbsdss" -> 9 parámetros
+//         $stmt->bind_param("ssssbsdss", 
+//             $idFinal,           // 1. karchivos
+//             $kagricultor,       // 2. kagricultor
+//             $kuuidPadre,        // 3. kuuid
+//             $tipo,              // 4. tipo_str
+//             $null,              // 5. archivo_bin (BLOB placeholder)
+//             $format,            // 6. formato_str
+//             $sizeMB,            // 7. sizemb_flt
+//             $filename,          // 8. nombrearchivo_str
+//             $finalPath          // 9. rutacompleta_str (Ruta en el NAS)
+//         );
+
+//         // Inyectamos el binario en el parámetro 4 (archivo_bin)
+//         $stmt->send_long_data(4, $fileContent); 
+        
+//         if (!$stmt->execute()) {
+//             throw new Exception("Error ejecución SQL: " . $stmt->error);
+//         }
+        
+//         $stmt->close();
+//         $conn->close();
+
+//         // --- CORRECCIÓN 3: Guardar físicamente en el NAS ---
+//         if (!file_exists($uploadDir)) {
+//             mkdir($uploadDir, 0777, true);
+//         }
+//         file_put_contents($finalPath, $fileContent);
+
+//         // RESPUESTA LIMPIA (Sin print_r ni printf que rompan el JSON de Flutter)
+//         return jsonResponse($response, [
+//             "mensaje" => "Sincronizado", 
+//             "uuid" => (string)$idFinal 
+//         ], 200);
+        
+//     } catch (Exception $e) {
+//         return jsonResponse($response, ["error" => $e->getMessage()], 500);
+//     }
+// }
+
+//este igaual, funciona pero regulín
+// function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
+// {
+//     $uploadedFiles = $request->getUploadedFiles();
+//     $parsedBody = $request->getParsedBody();
+//     $jwt = $request->getAttribute('jwt');
+//     $kagricultor = $jwt->sub;
+    
+//     if (!isset($uploadedFiles['archivo'])) {
+//         return jsonResponse($response, ["error" => "No se ha recibido ningún archivo"], 400);
+//     }
+
+//     $file = $uploadedFiles['archivo'];
+//     $kuuidPadre = $parsedBody['kuuid'] ?? null;
+//     $tipo = $parsedBody['tipo'] ?? null;
+//     $karchivos_cliente = $parsedBody['karchivos'] ?? null; 
+
+//     if (!$kuuidPadre || !$tipo) {
+//         return jsonResponse($response, ["error" => "Parámetros kuuid o tipo no proporcionados"], 400);
+//     }
+
+//     // --- CONFIGURACIÓN DEL ARCHIVO (DEFINIR ANTES DE USAR) ---
+//     $filename = $file->getClientFilename(); // <--- Aquí definimos el nombre
+//     $format = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+//     $sizeMB = round($file->getSize() / 1048576, 2);
+//     $fileContent = $file->getStream()->getContents(); // <--- Aquí extraemos el binario
+
+//     $idFinal = $karchivos_cliente ?: generarUUIDv4(); 
+//     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+//     $finalPath = rtrim($uploadDir, '/') . '/' . $idFinal . '.' . $extension;
+
+//     try {
+//         $conn = conectarDB($servername, $username, $password, $dbname);
+
+//         $sql = "INSERT INTO tblArchivos 
+//                 (karchivos, kagricultor, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, rutacompleta_str) 
+//                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+//                 ON DUPLICATE KEY UPDATE 
+//                     archivo_bin = VALUES(archivo_bin), 
+//                     rutacompleta_str = VALUES(rutacompleta_str),
+//                     sizemb_flt = VALUES(sizemb_flt),
+//                     nombrearchivo_str = VALUES(nombrearchivo_str)";
+        
+//         $stmt = $conn->prepare($sql);
+//         $null = null; 
+        
+//         // sssisssss -> 9 parámetros
+//         $stmt->bind_param("ssssbsdss", 
+//             $idFinal,           // 1. karchivos
+//             $kagricultor,       // 2. kagricultor
+//             $kuuidPadre,        // 3. kuuid
+//             $tipo,              // 4. tipo_str
+//             $null,              // 5. archivo_bin (Placeholder)
+//             $format,            // 6. formato_str
+//             $sizeMB,            // 7. sizemb_flt
+//             $filename,          // 8. nombrearchivo_str
+//             $finalPath          // 9. rutacompleta_str
+//         );
+
+//         $stmt->send_long_data(4, $fileContent); // Enviamos el binario real
+        
+//         if (!$stmt->execute()) {
+//             throw new Exception("Error ejecución SQL: " . $stmt->error);
+//         }
+        
+//         $stmt->close();
+//         $conn->close();
+
+//         // Guardar físicamente en el NAS
+//         if (!file_exists($uploadDir)) { mkdir($uploadDir, 0777, true); }
+//         file_put_contents($finalPath, $fileContent);
+
+//         return jsonResponse($response, ["mensaje" => "Sincronizado", "uuid" => (string)$idFinal], 200);
+        
+//     } catch (Exception $e) {
+//         return jsonResponse($response, ["error" => $e->getMessage()], 500);
+//     }
+// }
+
+function subirArchivo(Request $request, Response $response, $servername, $username, $password, $dbname, $uploadDir): Response
+{
+    $uploadedFiles = $request->getUploadedFiles();
+    $parsedBody = $request->getParsedBody();
+    $jwt = $request->getAttribute('jwt');
+    $kagricultor = $jwt->sub;
+    
+    if (!isset($uploadedFiles['archivo'])) {
+        return jsonResponse($response, ["error" => "No se recibió el archivo"], 400);
+    }
+
+    $file = $uploadedFiles['archivo'];
+    $kuuidPadre = $parsedBody['kuuid'] ?? null;
+    $tipo = $parsedBody['tipo'] ?? null;
+    $karchivos_cliente = $parsedBody['karchivos'] ?? null; 
+
+    // --- DEFINICIÓN CRÍTICA DE VARIABLES ---
+    $filename = $file->getClientFilename() ?? 'archivo_sin_nombre'; // <--- DEFINIR AQUÍ
+    $fileContent = $file->getStream()->getContents();             // <--- DEFINIR AQUÍ
+    $format = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+    $sizeMB = round($file->getSize() / 1048576, 2);
+
+    $idFinal = $karchivos_cliente ?: generarUUIDv4(); 
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $finalPath = rtrim($uploadDir, '/') . '/' . $idFinal . '.' . $extension;
+
+    try {
+        $conn = conectarDB($servername, $username, $password, $dbname);
+
+        $sql = "INSERT INTO tblArchivos 
+                (karchivos, kagricultor, kuuid, tipo_str, archivo_bin, formato_str, sizemb_flt, nombrearchivo_str, rutacompleta_str) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                    archivo_bin = VALUES(archivo_bin), 
+                    rutacompleta_str = VALUES(rutacompleta_str),
+                    sizemb_flt = VALUES(sizemb_flt),
+                    nombrearchivo_str = VALUES(nombrearchivo_str)";
+        
+        $stmt = $conn->prepare($sql);
+        $null = null; 
+        
+        $stmt->bind_param("ssssbsdss", 
+            $idFinal, $kagricultor, $kuuidPadre, $tipo, 
+            $null, $format, $sizeMB, $filename, $finalPath
+        );
+
+        $stmt->send_long_data(4, $fileContent); // Inyectamos el binario real
+        
+        $stmt->execute();
+        $stmt->close();
+        $conn->close();
+
+        if (!file_exists($uploadDir)) { mkdir($uploadDir, 0777, true); }
+        file_put_contents($finalPath, $fileContent);
+
+        return jsonResponse($response, ["mensaje" => "Sincronizado", "uuid" => (string)$idFinal], 200);
+        
+    } catch (Exception $e) {
+        return jsonResponse($response, ["error" => $e->getMessage()], 500);
+    }
+}
+/**
+ * Función auxiliar para generar UUID v4 compatible con MariaDB/MySQL
+ */
+function generarUUIDv4() {
+    $data = random_bytes(16);
+    $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // versión 4
+    $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // variante RFC 4122
+    return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}

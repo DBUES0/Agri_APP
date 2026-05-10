@@ -34,8 +34,12 @@ $password = $_ENV['DB_PASS'];
 $dbname = $_ENV['DB_NAME'];
 $uploadDir = $_ENV['FILE_UPLOAD_PATH'];
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// Por esto:
+ini_set('display_errors', 0); // Desactiva la salida de errores al cliente
+ini_set('log_errors', 1);      // Pero guárdalos en el log del servidor para revisarlos
+
 error_reporting(E_ALL);
 
 // Funcion para usar JWTMIDDELWARE que sabe dios lo que es eso
@@ -325,7 +329,8 @@ $app->post('/api/albarancabecera[/]', function (Request $request, Response $resp
     $data = json_decode($request->getBody()->getContents(), true);
     $jwt = $request->getAttribute('jwt');
     $kagricultor = $jwt->sub;
-    
+
+    $kalbaranId = $data['kalbaran']; // El UUID que viene de la App
     $kalmacen = $data['kalmacen'] ?? null;  
     $ktipoprecio = $data['ktipodeprecio'] ?? null;  
     $comentario = $data['comentario_str'] ?? null;  
@@ -339,16 +344,18 @@ $app->post('/api/albarancabecera[/]', function (Request $request, Response $resp
         $conn = conectarDB($servername, $username, $password, $dbname);
         
         // 1. Insertar Cabecera (Tu código actual)
-        $stmt = $conn->prepare("INSERT INTO tblalbaran(kagricultor, fecha_dtm, kalmacen, ktipodeprecio, comentario_str, ktipoalbaran, idalbaran_str) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssss", $kagricultor, $kfecha, $kalmacen, $ktipoprecio, $comentario, $ktipoalbaran, $idalbaran_str);
+        //$stmt = $conn->prepare("INSERT INTO tblalbaran(kagricultor, fecha_dtm, kalmacen, ktipodeprecio, comentario_str, ktipoalbaran, idalbaran_str) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO tblalbaran (kalbaran, kagricultor, fecha_dtm, kalmacen, ktipodeprecio, comentario_str, ktipoalbaran, idalbaran_str) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        //$stmt->bind_param("sssssss", $kagricultor, $kfecha, $kalmacen, $ktipoprecio, $comentario, $ktipoalbaran, $idalbaran_str);
+        $stmt->bind_param("ssssssss", $kalbaranId, $kagricultor, $kfecha, $kalmacen, $ktipoprecio, $comentario, $ktipoalbaran, $idalbaran_str);
         $stmt->execute();
 
         // 2. Obtener el kalbaran recién creado
         $kalbaran = $conn->insert_id; // Si es auto-increment
         // Si usas UUID, mejor tu consulta actual:
-        $uuidStmt = $conn->prepare("SELECT kalbaran FROM tblalbaran WHERE kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
-        $uuidStmt->bind_param("s", $kagricultor);
-        $uuidStmt->execute();
+        //$uuidStmt = $conn->prepare("SELECT kalbaran FROM tblalbaran WHERE kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
+        //$uuidStmt->bind_param("s", $kagricultor);
+        //$uuidStmt->execute();
         $uuidStmt->bind_result($kalbaran);
         $uuidStmt->fetch();
         $uuidStmt->close();
@@ -366,7 +373,7 @@ $app->post('/api/albarancabecera[/]', function (Request $request, Response $resp
         }
 
         $conn->close();
-        return jsonResponse($response, ["mensaje" => "Cabecera y archivos vinculados", "kalbaran" => $kalbaran]);
+        return jsonResponse($response, ["mensaje" => "Cabecera y archivos vinculados", "kalbaran" => $kalbaranId]);
         
     } catch (Exception $e) {
         return jsonResponse($response, ["error" => $e->getMessage()], 500);

@@ -733,7 +733,9 @@ showDialog(
                   children: [
                     // Fila para elegir la fecha.
                     ListTile(
-                      title: Text('Fecha: ${_fecha.day}/${_fecha.month}/${_fecha.year}'),
+                        title: Text(
+                          'Fecha: ${_fecha.day.toString().padLeft(2, '0')}/${_fecha.month.toString().padLeft(2, '0')}/${_fecha.year}'
+                        ),
                       trailing: const Icon(Icons.calendar_today, color: AgriPalette.greenMain),
                       onTap: () async {
                         // Abre el calendario del sistema Android.
