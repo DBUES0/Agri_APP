@@ -112,15 +112,21 @@ class SyncService {
             break; 
           }
 
-        } catch (e) {
-          // Si el token ha expirado, relanzamos para que la App desloguee
-          if (e.toString().contains("401") || e.toString().contains("Expired token")) {
-             print("Sesión expirada en segundo plano.");
-             rethrow; 
+          } catch (e) {
+            // Si es un error de formato (HTML en lugar de JSON), es un 502/504
+            if (e is FormatException) {
+              print("El servidor devolvió una respuesta no válida (posible 502). Reintentando en 30s...");
+            } else if (e.toString().contains("401") || e.toString().contains("Expired token")) {
+              print("Sesión expirada.");
+              rethrow;
+            } else {
+              print("Fallo de red: $e");
+            }
+            
+            // Salimos del bucle para este intento, pero no marcamos como sincronizado
+            // para que el Timer vuelva a intentarlo en 30 segundos.
+            break; 
           }
-          print("Fallo de conexión o red para el registro ${item['id']}: $e");
-          break; // Salimos y reintentamos en 30 segundos
-        }
       }
 
       // --- 3. NOTIFICACIÓN A LA UI ---

@@ -9,6 +9,7 @@ import 'package:sqflite/sqflite.dart';                        // Para ConflictAl
 import 'db_service.dart';                                     // Para que reconozca DBService
 import 'package:flutter/material.dart'; // <--- ARREGLA CONTEXT, NAVIGATOR Y MATERIALPAGEROUTE
 import '../pages/page_login.dart';    // <--- ARREGLA EL ERROR DE LOGINPAGE
+import 'dart:async';
 
 
 
@@ -52,44 +53,97 @@ class ApiService {
       }),
     );
 
-    if (response.statusCode == 200) {
-      // Si el servidor dice OK, devolvemos los datos (token y usuario)
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);
+    } else if (response.statusCode >= 500) {
+      // Si es 502, 503, etc., devolvemos un error controlado sin intentar decodificar HTML
+      print("SERVIDOR NO DISPONIBLE (${response.statusCode})");
+      return {"error": "Servidor temporalmente fuera de servicio"};
     } else {
-      // Si hay error (ej: contraseña mal), lanzamos un mensaje
-      final errorData = jsonDecode(response.body);
-      throw errorData['error'] ?? 'Error desconocido al iniciar sesión';
+      // Para errores 400 (Bad Request), intentamos leer el JSON de error si existe
+      try {
+        return jsonDecode(response.body);
+      } catch (_) {
+        return {"error": "Error desconocido: ${response.statusCode}"};
+      }
     }
   }
 
   // 2. Listar tablas genéricas (fincas, almacenes...)
-  Future<List<dynamic>> fetchList(String endpoint, {bool isComun = false}) async {
-    // Si es común usa /listarcomun/, si no /listar/
-    final url = Uri.parse('$baseUrl${isComun ? '/listarcomun/' : '/listar/'}$endpoint');
-    // print('Hola1');
-    // print(url);
-    final response = await http.get(url, headers: await _getHeaders());
-    // print('Hola2');
-    // print(response.body);
+    Future<List<dynamic>> fetchList(String endpoint, {bool isComun = false}) async {
+      final url = Uri.parse('$baseUrl${isComun ? '/listarcomun/' : '/listar/'}$endpoint');
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw 'No se pudo cargar la lista de $endpoint';
+      try {
+        // Añadimos un timeout para que la App no se quede "colgada" si el proxy no responde
+        final response = await http.get(url, headers: await _getHeaders()).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          // CASO ÉXITO: El servidor responde con JSON válido
+          return jsonDecode(response.body);
+        } 
+        else if (response.statusCode >= 500) {
+          // CASO SERVIDOR CAÍDO (502 Bad Gateway, 503...): 
+          // La respuesta suele ser HTML, así que NO hacemos jsonDecode.
+          print("SERVIDOR NO DISPONIBLE (${response.statusCode}) al cargar $endpoint");
+          // Devolvemos una lista vacía para que la UI no rompa y cargue lo que tenga en local
+          return []; 
+        } 
+        else {
+          // Otros errores (401, 403, 404...)
+          print("Error de API (${response.statusCode}): ${response.body}");
+          throw 'Error ${response.statusCode} al cargar $endpoint';
+        }
+      } catch (e) {
+        // Capturamos errores de red o FormatException (cuando llega HTML en lugar de JSON)
+        if (e is FormatException) {
+          print("ERROR DE FORMATO en $endpoint: El servidor devolvió HTML (posible 502).");
+        } else {
+          print("EXCEPCIÓN DE CONEXIÓN al cargar $endpoint: $e");
+        }
+        
+        // Si falla la red o el formato, devolvemos lista vacía 
+        // Esto permite que el flujo offline continúe sin lanzar errores rojos a la pantalla
+        return [];
+      }
     }
-  }
 
   // 2.1 Listar vistas (vfincas, almacenes...)
   Future<List<dynamic>> fetchListV(String endpoint, {bool isComun = false}) async {
     // Si es común usa /listarcomun/, si no /listar/
     final url = Uri.parse('$baseUrl/vista/$endpoint');
-    final response = await http.get(url, headers: await _getHeaders());
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw 'No se pudo cargar la lista de $endpoint';
+      try {
+        // Añadimos un timeout para que la App no se quede "colgada" si el proxy no responde
+        final response = await http.get(url, headers: await _getHeaders()).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          // CASO ÉXITO: El servidor responde con JSON válido
+          return jsonDecode(response.body);
+        } 
+        else if (response.statusCode >= 500) {
+          // CASO SERVIDOR CAÍDO (502 Bad Gateway, 503...): 
+          // La respuesta suele ser HTML, así que NO hacemos jsonDecode.
+          print("SERVIDOR NO DISPONIBLE (${response.statusCode}) al cargar $endpoint");
+          // Devolvemos una lista vacía para que la UI no rompa y cargue lo que tenga en local
+          return []; 
+        } 
+        else {
+          // Otros errores (401, 403, 404...)
+          print("Error de API (${response.statusCode}): ${response.body}");
+          throw 'Error ${response.statusCode} al cargar $endpoint';
+        }
+      } catch (e) {
+        // Capturamos errores de red o FormatException (cuando llega HTML en lugar de JSON)
+        if (e is FormatException) {
+          print("ERROR DE FORMATO en $endpoint: El servidor devolvió HTML (posible 502).");
+        } else {
+          print("EXCEPCIÓN DE CONEXIÓN al cargar $endpoint: $e");
+        }
+        
+        // Si falla la red o el formato, devolvemos lista vacía 
+        // Esto permite que el flujo offline continúe sin lanzar errores rojos a la pantalla
+        return [];
+      }
     }
-  }
   // 3. Endpoints especiales (como los albaranes que tienen lógica compleja)
   // Future<List<dynamic>> fetchParticular(String endpoint) async {
   //   final url = Uri.parse('$baseUrl/$endpoint');
@@ -125,10 +179,41 @@ Future<List<dynamic>> fetchParticular(String endpoint) async {
 // En ApiService.dart añade:
 
 Future<Map<String, dynamic>> postParticular(String endpoint, Map<String, dynamic> data) async {
-  final url = Uri.parse('$baseUrl/$endpoint');
-  final response = await http.post(url, headers: await _getHeaders(), body: jsonEncode(data));
-  if (response.statusCode == 200 || response.statusCode == 201) return jsonDecode(response.body);
-  throw 'Error en $endpoint: ${response.body}';
+  final url = Uri.parse('$baseUrl/$endpoint');        
+  
+  try {
+    // CAMBIO VITAL: Usar http.post y enviar el body
+    final response = await http.post(
+      url, 
+      headers: await _getHeaders(),
+      body: jsonEncode(data), // Enviamos los datos del albarán/gasto
+    ).timeout(const Duration(seconds: 30)); // 30s es más seguro para albaranes grandes
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } 
+    else if (response.statusCode >= 500) {
+      print("SERVIDOR NO DISPONIBLE (${response.statusCode}) en $endpoint");
+      return {"error": "Servidor temporalmente fuera de servicio"};
+    } 
+    else {
+      try {
+        return jsonDecode(response.body);
+      } catch (_) {
+        return {"error": "Error del servidor (${response.statusCode})"};
+      }
+    }
+  } catch (e) {
+    if (e is FormatException) {
+      print("ERROR DE FORMATO en $endpoint: Respuesta no válida (HTML).");
+      return {"error": "El servidor no respondió con un formato correcto."};
+    } else if (e is TimeoutException) {
+      print("TIEMPO AGOTADO en la conexión con $endpoint.");
+      return {"error": "Tiempo de espera agotado"};
+    }
+    print("EXCEPCIÓN en $endpoint: $e");
+    return {"error": "Error de conexión: $e"};
+  }
 }
 
 Future<void> putGeneric(String tabla, String id, Map<String, dynamic> data) async {
@@ -277,36 +362,45 @@ Future<void> descargarYVerArchivo(String karchivo) async {
 }
 
 Future<Map<String, dynamic>> mergeAlbaran(Map<String, dynamic> albaranData) async {
-  // El endpoint espera un array de objetos según tu PHP: if (!isset($input[0]))
+  // El endpoint espera un array de objetos según tu PHP
   final body = [albaranData]; 
-  
   final url = Uri.parse('$baseUrl/mergealbaran');
-  print("mensaje enviado al servidor: ${body.toString()}");
-  print("mensaje enviado al servidor: ${jsonEncode(body)}");
-  final response = await http.post(
-    url, 
-    headers: await _getHeaders(), 
-    body: jsonEncode(body)
-  );
 
-if (response.statusCode == 200) {
-    return jsonDecode(response.body);
-  } else {
-    // Si la respuesta contiene HTML (un error de PHP), no intentamos decodificarlo como JSON
-    if (response.body.contains('<br />') || response.body.contains('<b>Fatal error</b>')) {
-       throw 'Error interno del servidor (PHP). Revise los logs del servidor.';
+  try {
+    final response = await http.post(
+      url, 
+      headers: await _getHeaders(), 
+      body: jsonEncode(body)
+    ).timeout(const Duration(seconds: 30)); // Timeout más largo para el merge
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // CASO ÉXITO
+      return jsonDecode(response.body);
+    } 
+    else if (response.statusCode >= 500) {
+      // CASO SERVIDOR CAÍDO (502 Bad Gateway detectado en logs)
+      print("SERVIDOR NO DISPONIBLE (${response.statusCode}) en mergeAlbaran");
+      return {'error': 'Servidor fuera de servicio temporalmente (Error ${response.statusCode})'};
+    } 
+    else {
+      // CASO ERROR CONTROLADO (400, 401, 403...)
+      try {
+        return jsonDecode(response.body);
+      } catch (_) {
+        return {'error': 'Error en el servidor (${response.statusCode})'};
+      }
+    }
+  } catch (e) {
+    // GESTIÓN DE EXCEPCIONES (Red o Formato HTML)
+    if (e is FormatException) {
+      print("ERROR DE FORMATO en mergeAlbaran: El servidor devolvió HTML (posible 502).");
+      return {'error': 'La respuesta del servidor no es un JSON válido'};
     }
     
-    // Si es un error controlado por tu API (en formato JSON)
-    try {
-      final error = jsonDecode(response.body);
-      throw error['error'] ?? 'Error desconocido';
-    } catch (_) {
-      throw 'Error en la respuesta del servidor (${response.statusCode})';
-    }
+    print("EXCEPCIÓN en mergeAlbaran: $e");
+    return {'error': 'No se pudo conectar con el servidor: $e'};
   }
 }
-
 Future<List<Map<String, dynamic>>> fetchIncremental(String endpoint) async {
   // 1. CAMBIO: Usar DBService en lugar de AI
   final db = await DBService.instance.database;
@@ -518,7 +612,6 @@ Future<void> cerrarSesion(BuildContext context) async {
 //     return null;
 //   }
 // }
-
 Future<String?> subirArchivoMultipart(
   String pathLocal, 
   String kuuidPadre, 
@@ -526,13 +619,10 @@ Future<String?> subirArchivoMultipart(
   {String? karchivoLocal}
 ) async {
   try {
-    // CORRECCIÓN 1: Evitar el doble /api/api
-    // Si baseUrl ya termina en /api, no lo pongas aquí.
     final String cleanUrl = baseUrl.endsWith('/api') ? '$baseUrl/archivo' : '$baseUrl/api/archivo';
     var request = http.MultipartRequest('POST', Uri.parse(cleanUrl));
     
-    // CORRECCIÓN 2: Headers manuales para asegurar el Bearer Token
-    final String? token = await _getToken(); // Tu función que saca el JWT de las SharedPreferences
+    final String? token = await _getToken();
     request.headers['Authorization'] = 'Bearer $token';
     request.headers['Accept'] = 'application/json';
 
@@ -542,7 +632,6 @@ Future<String?> subirArchivoMultipart(
       request.fields['karchivos'] = karchivoLocal;
     }
 
-    // Validación de archivo local
     final file = File(pathLocal);
     if (!await file.exists()) {
       print("INFO: Saltando archivo no local o inexistente: $pathLocal");
@@ -552,19 +641,43 @@ Future<String?> subirArchivoMultipart(
     request.files.add(await http.MultipartFile.fromPath('archivo', pathLocal));
 
     print("Subiendo binario a: $cleanUrl");
+    
+    // Ejecutamos el envío con un timeout de seguridad
     var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
     var response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode == 200) {
+    // --- BLOQUE DE CONTROL ROBUSTO ---
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // ÉXITO: El servidor respondió con JSON válido
       final resBody = jsonDecode(response.body);
       return resBody['uuid']?.toString();
-    } else {
-      print("ERROR SERVIDOR (${response.statusCode}): ${response.body}");
+    } 
+    else if (response.statusCode >= 500) {
+      // ERROR DE SERVIDOR (502, 503...): La respuesta suele ser HTML
+      print("SERVIDOR NO DISPONIBLE (${response.statusCode}) en subida de archivo. Abortando intento actual.");
+      return null; // Devolvemos null para que SyncService reintente luego
+    } 
+    else {
+      // OTROS ERRORES (400, 401, 404): Intentamos leer el JSON de error si es posible
+      print("ERROR SERVIDOR (${response.statusCode})");
+      try {
+        final errorJson = jsonDecode(response.body);
+        print("Detalle del error: ${errorJson['error']}");
+      } catch (_) {
+        print("No se pudo decodificar el detalle del error (posible respuesta no-JSON).");
+      }
       return null;
     }
   } catch (e) {
-    print("EXCEPCIÓN SUBIDA: $e");
-    return null;
+    // GESTIÓN DE EXCEPCIONES (Red o Formato HTML)
+    if (e is FormatException) {
+      print("ERROR DE FORMATO en subida: El servidor devolvió HTML en lugar de JSON (posible 502).");
+    } else if (e is TimeoutException) {
+      print("TIEMPO AGOTADO en la subida del archivo.");
+    } else {
+      print("EXCEPCIÓN SUBIDA: $e");
+    }
+    return null; // No rompemos la App, simplemente cancelamos este archivo por ahora
   }
 }
 }
