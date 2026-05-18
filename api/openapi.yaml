@@ -195,6 +195,10 @@ paths:
                         format: date-time
                         description: Fecha de eliminación del usuario
                         example: null
+                      pref_agrupacion_str:
+                        type: string
+                        description: Criterio dinámico de agrupación de movimientos (separado por comas)
+                        example: "cultivo,finca,fecha"
         '400':
           description: Faltan credenciales
           content:

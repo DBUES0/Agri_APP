@@ -11,6 +11,8 @@ class Usuario {
   final int intentos;       // Contador de intentos de login fallidos
   final String ultimoIntento; // Fecha del último intento (formato String)
   final String tipoUsuario; // Identificador del rol o tipo de usuario
+  final String prefAgrupacion; // Criterio dinámico de agrupación de movimientos (separado por comas)
+  final String prefAgrupacionGastos; // Criterio dinámico de agrupación de gastos (separado por comas)
 
   Usuario({
     required this.nombre,
@@ -24,6 +26,8 @@ class Usuario {
     required this.intentos,
     required this.ultimoIntento,
     required this.tipoUsuario,
+    required this.prefAgrupacion,
+    required this.prefAgrupacionGastos
   });
 
   /// Crea una instancia de [Usuario] a partir de un mapa JSON.
@@ -44,6 +48,8 @@ class Usuario {
       // Nota: Se mantiene como String, considerar DateTime.parse() si se requiere operar con fechas
       ultimoIntento: json['ultimointentologin_dtm'] ?? '',
       tipoUsuario: json['ktipodeusuario'] ?? '',
+      prefAgrupacion: json['pref_agrupacion_str'] ?? '',
+      prefAgrupacionGastos: json['pref_agrupacion_gastos_str'] ?? ''
     );
   }
   Map<String, dynamic> toJson() => {
@@ -58,5 +64,7 @@ class Usuario {
         'numintentos_int': intentos,
         'ultimointentologin_dtm': ultimoIntento,
         'ktipodeusuario': tipoUsuario,
+        'pref_agrupacion_str': prefAgrupacion,
+        'pref_agrupacion_gastos_str': prefAgrupacionGastos
       };
 }

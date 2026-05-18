@@ -20,6 +20,7 @@ import '../models/record_tipogasto.dart';
 import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
+import '../models/record_movimientovisual.dart';
 import '../pages/page_albaran.dart';
 
 
@@ -61,6 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
   
   // Controla si la sección general de Albaranes está abierta o cerrada.
   bool _albaranesExpanded = false;
+  bool _albaranes2Expanded = false;
   
   // Lista local de albaranes que podemos refrescar sin salir de la página.
   List<Albaran> _albaranes = [];
@@ -342,74 +344,137 @@ Future<void> _intentarSincroManual() async {
     );
   }
 
+// @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//               centerTitle: false,
+//               // En lugar de usar 'leading', ponemos todo en el 'title' 
+//               // para que fluya de forma natural hacia la derecha.
+//               title: Row(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   AppTheme.buildLogo(fontSize: 22), // El logo mixto
+//                   const SizedBox(width: 22),        // Un poco de separación
+//                   Expanded(
+//                     child: Text(
+//                       '${widget.usuario.nombre} ${widget.usuario.apellidos}',
+//                       style:  Theme.of(context).textTheme.titleMedium, //const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+//                       overflow: TextOverflow.ellipsis, // Por si el nombre es muy largo
+//                     ),
+//                   ),
+//                 ],
+//               ),
+
+//         // 3. ICONOS DE FUNCIÓN A LA DERECHA (se mantienen en actions)
+//         actions: [
+//           const IconoSync(),
+//           IconButton(
+//             icon: const Icon(Icons.sync),
+//             tooltip: 'Sincronizar', // Ayuda al usuario
+//             onPressed: _superRefresh, // _refreshAll,
+//           ),
+//           IconButton(
+//             icon: const Icon(Icons.edit),
+//             tooltip: 'Editar Perfil',
+//             onPressed: _goToUsuario,
+//           ),
+//           IconButton(
+//             icon: const Icon(Icons.logout),
+//             tooltip: 'Cerrar Sesión',
+//             onPressed: _logout,
+//           ),
+//         ],
+//       ),
+//       body: ListView(
+//         padding: const EdgeInsets.all(16),
+//         children: [
+//           // Sección principal de Albaranes (con cálculos de kilos)
+//           //_buildAlbaranesSection(),
+//           StreamBuilder<List<Albaran>>(
+//               stream: _getAlbaranesStream(),
+//               builder: (context, snapshot) {
+//                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                
+//                 // Actualizamos nuestra lista interna para que el resto de funciones sigan funcionando
+//                 _albaranes = snapshot.data!; 
+                
+//                 return _buildAlbaranesSection(); // Tu método actual ahora usará la lista combinada
+//               },
+//             ),
+//           _buildAlbaranes2Section(),
+//           // Secciones secundarias (TODO: Implementar sus páginas específicas)
+//           _buildSection('Gastos', onAdd: () {}),
+//           _buildSection('Operaciones', onAdd: () {}),
+//           _buildSection('Jornadas', onAdd: () {}, extra: const Text("Último día: 2025/05/19")),
+//           _buildSection('Notas', onAdd: () {}),
+//         ],
+//       ),
+//     );
+//   }
+
 @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-              centerTitle: false,
-              // En lugar de usar 'leading', ponemos todo en el 'title' 
-              // para que fluya de forma natural hacia la derecha.
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppTheme.buildLogo(fontSize: 22), // El logo mixto
-                  const SizedBox(width: 22),        // Un poco de separación
-                  Expanded(
-                    child: Text(
-                      '${widget.usuario.nombre} ${widget.usuario.apellidos}',
-                      style:  Theme.of(context).textTheme.titleMedium, //const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-                      overflow: TextOverflow.ellipsis, // Por si el nombre es muy largo
-                    ),
-                  ),
-                ],
-              ),
-
-        // 3. ICONOS DE FUNCIÓN A LA DERECHA (se mantienen en actions)
-        actions: [
-          const IconoSync(),
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sincronizar', // Ayuda al usuario
-            onPressed: _superRefresh, // _refreshAll,
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'Editar Perfil',
-            onPressed: _goToUsuario,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar Sesión',
-            onPressed: _logout,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      centerTitle: false,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Sección principal de Albaranes (con cálculos de kilos)
-          //_buildAlbaranesSection(),
-          StreamBuilder<List<Albaran>>(
-              stream: _getAlbaranesStream(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                
-                // Actualizamos nuestra lista interna para que el resto de funciones sigan funcionando
-                _albaranes = snapshot.data!; 
-                
-                return _buildAlbaranesSection(); // Tu método actual ahora usará la lista combinada
-              },
+          AppTheme.buildLogo(fontSize: 22), 
+          const SizedBox(width: 22),        
+          Expanded(
+            child: Text(
+              '${widget.usuario.nombre} ${widget.usuario.apellidos}',
+              style: Theme.of(context).textTheme.titleMedium,
+              overflow: TextOverflow.ellipsis,
             ),
-          // Secciones secundarias (TODO: Implementar sus páginas específicas)
-          _buildSection('Gastos', onAdd: () {}),
-          _buildSection('Operaciones', onAdd: () {}),
-          _buildSection('Jornadas', onAdd: () {}, extra: const Text("Último día: 2025/05/19")),
-          _buildSection('Notas', onAdd: () {}),
+          ),
         ],
       ),
-    );
-  }
-
+      actions: [
+        const IconoSync(),
+        IconButton(
+          icon: const Icon(Icons.sync),
+          tooltip: 'Sincronizar', 
+          onPressed: _superRefresh, 
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit),
+          tooltip: 'Editar Perfil',
+          onPressed: _goToUsuario,
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout),
+          tooltip: 'Cerrar Sesión',
+          onPressed: _logout,
+        ),
+      ],
+    ),
+    // --- REESTRUCTURACIÓN DE SEGURIDAD ---
+    body: StreamBuilder<List<Albaran>>(
+      stream: _getAlbaranesStream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        
+        // Asignación segura dentro del flujo asíncrono
+        _albaranes = snapshot.data!; 
+        
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildAlbaranesSection(), // Tarjeta 1 (Original)
+            _buildAlbaranes2Section(), // Tarjeta 2 (Zona de pruebas dinámica)
+            _buildSection('Gastos', onAdd: () {}),
+            _buildSection('Operaciones', onAdd: () {}),
+            _buildSection('Jornadas', onAdd: () {}, extra: const Text("Último día: 2025/05/19")),
+            _buildSection('Notas', onAdd: () {}),
+          ],
+        );
+      },
+    ),
+  );
+}
   /// [buildAlbaranesSection] es la parte más compleja: calcula totales y agrupa por finca.
   Widget _buildAlbaranesSection() {
     // 1. Extraemos todos los renglones (detalles) de todos los albaranes en una sola lista.
@@ -607,6 +672,318 @@ Future<void> _intentarSincroManual() async {
           ],
         ),
       ),
+    );
+  }
+
+// ==========================================================================
+  // MOTOR DE AGRAUPACIÓN DINÁMICA (ALBARANES 2)
+  // ==========================================================================
+
+  /// 1. Aplana la estructura de Albaranes -> Detalles a una lista independiente
+  List<MovimientoVisual> _aplanarMovimientos() {
+    List<MovimientoVisual> listaPlana = [];
+
+    for (var alb in _albaranes) {
+      final almObj = widget.almacen.firstWhere(
+        (a) => a.kalmacen == alb.kalmacen,
+        orElse: () => Almacen(kalmacen: '', nombreStr: 'Sin Almacén', fecha: DateTime.now(), kagricultor: '', ktipoalbaran: ''),
+      );
+
+      for (var det in alb.detalles) {
+        final fincaObj = widget.fincas.firstWhere(
+          (f) => f.kfinca == det.kfinca,
+          orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: 'Finca Desconocida', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
+        );
+
+        final prodObj = widget.producto.firstWhere(
+          (p) => p.kproducto == det.kproducto,
+          orElse: () => Producto(kproducto: '', productoStr: 'Desconocido', fecha: DateTime.now(), ktipoproducto: '', tipoproductoStr: ''),
+        );
+
+        final fincaM2 = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+
+        listaPlana.add(MovimientoVisual(
+          idFinca: det.kfinca,
+          nombreFinca: fincaObj.nombreStr,
+          idProducto: det.kproducto,
+          nombreProducto: prodObj.productoStr,
+          idAlmacen: alb.kalmacen,
+          nombreAlmacen: almObj.nombreStr,
+          fecha: alb.fecha,
+          kg: det.kg,
+          rendimientoM2: det.kg / fincaM2,
+          albaranPadre: alb,
+          detalleOriginal: det,
+        ));
+      }
+    }
+    return listaPlana;
+  }
+
+  /// 2. Construye la tarjeta contenedora de Albaranes 2
+  // Widget _buildAlbaranes2Section() {
+  //   final movimientos = _aplanarMovimientos();
+  //   final totalKg = movimientos.fold<double>(0, (sum, m) => sum + m.kg);
+
+  //   // Recuperamos tu nueva propiedad del objeto usuario (o un fallback por defecto)
+  //   // NOTA: Asegúrate de que el modelo Usuario tenga mapeado 'prefAgrupacionStr'
+  //   // String configRaw = widget.usuario.prefAgrupacion ?? "finca,cultivo,fecha";
+  //   String configRaw = widget.usuario.prefAgrupacion.isEmpty 
+  //       ? "finca,cultivo,fecha" 
+  //       : widget.usuario.prefAgrupacion;
+  //   List<String> criterios = configRaw.split(',');
+
+  //   return Card(
+  //     color: AgriPalette.background.withValues(alpha: 0.5), // Un tono sutilmente diferente para distinguirlo
+  //     elevation: 3,
+  //     margin: const EdgeInsets.symmetric(vertical: 10),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(12.0),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           InkWell(
+  //             onTap: () => setState(() => _albaranes2Expanded = !_albaranes2Expanded),
+  //             child: Padding(
+  //               padding: const EdgeInsets.symmetric(vertical: 8.0),
+  //               child: Row(
+  //                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   Row(
+  //                     children: [
+  //                       // const Icon(Icons.layers_outlined, color: AgriPalette.greenMain),
+  //                       const SizedBox(width: 8),
+  //                       Text(
+  //                         'ALBARANES: ${totalKg.toStringAsFixed(0)} kg', 
+  //                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+  //                       ),
+  //                     ],
+  //                   ),
+  //                   IconButton(
+  //                     icon: const Icon(Icons.add_box_outlined), 
+  //                     color: AgriPalette.greenMain, 
+  //                     onPressed: () => _goToAlbaran(),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //           if (_albaranes2Expanded)
+  //             _construirNivelDinamicamente(movimientos, criterios, 0),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+/// 2. Construye la tarjeta contenedora de Albaranes 2 (Estética unificada)
+  // Widget _buildAlbaranes2Section() {
+  //   final movimientos = _aplanarMovimientos();
+  //   final totalKg = movimientos.fold<double>(0, (sum, m) => sum + m.kg);
+
+  //   // Salvaguarda contra cadenas vacías desde SQLite/Base de datos
+  //   String configRaw = widget.usuario.prefAgrupacion.isEmpty 
+  //       ? "finca,cultivo,fecha" 
+  //       : widget.usuario.prefAgrupacion;
+  //   List<String> criterios = configRaw.split(',');
+
+  //   return Card(
+  //     elevation: 2,
+  //     margin: const EdgeInsets.symmetric(vertical: 10),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(12.0),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           // Cabecera Principal con el formato de texto exacto del original
+  //           InkWell(
+  //             onTap: () => setState(() => _albaranes2Expanded = !_albaranes2Expanded),
+  //             child: Padding(
+  //               padding: const EdgeInsets.symmetric(vertical: 8.0),
+  //               child: Row(
+  //                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //                 children: [
+  //                   Text(
+  //                     'Albaranes (Dinámico): ${totalKg.toStringAsFixed(2)} kg', 
+  //                     style: Theme.of(context).textTheme.titleLarge,
+  //                   ),
+  //                   IconButton(
+  //                     icon: const Icon(Icons.add), 
+  //                     color: AgriPalette.greenMain, 
+  //                     onPressed: () => _goToAlbaran(),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //           if (_albaranes2Expanded)
+  //             _construirNivelDinamicamente(movimientos, criterios, 0),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+
+/// 2. Construye la tarjeta contenedora de Albaranes 2 (Estética unificada)
+Widget _buildAlbaranes2Section() {
+  final movimientos = _aplanarMovimientos();
+  final totalKg = movimientos.fold<double>(0, (sum, m) => sum + m.kg);
+
+  String configRaw = widget.usuario.prefAgrupacion.isEmpty 
+      ? "finca,cultivo,fecha" 
+      : widget.usuario.prefAgrupacion;
+  List<String> criterios = configRaw.split(',');
+
+  return Card(
+    elevation: 2,
+    margin: const EdgeInsets.symmetric(vertical: 10),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Copiado idéntico del formato estético original
+          InkWell( 
+            onTap: () => setState(() => _albaranes2Expanded = !_albaranes2Expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0), 
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Albaranes (Dinámico): ${totalKg.toStringAsFixed(2)} kg', 
+                      style: Theme.of(context).textTheme.titleLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add), 
+                    color: AgriPalette.greenMain, 
+                    onPressed: () => _goToAlbaran(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_albaranes2Expanded)
+            _construirNivelDinamicamente(movimientos, criterios, 0),
+        ],
+      ),
+    ),
+  );
+}
+  /// 3. Función recursiva encargada de anidar ExpansionTiles dinámicamente
+/// 3. Función recursiva de anidamiento limpia (Corrige Crash de Scroll y Estética)
+  Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<String> criterios, int indexCriterio) {
+    // CONDICIÓN TERMINAL: Renderizado de las hojas finales (Líneas de producto)
+    if (indexCriterio >= criterios.length) {
+      return Column(
+        children: datosNodo.map((m) {
+          return ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            title: Text(
+              'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ${m.kg.toStringAsFixed(2)} kg',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            subtitle: Text(
+              'Doc: ${m.albaranPadre.idalbaranstr} | Almacén: ${m.nombreAlmacen}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20, color: AgriPalette.greenMain),
+                  onPressed: () => _goToAlbaran(albaran: m.albaranPadre),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20, color: AgriPalette.greenMain),
+                  onPressed: () => _confirmDeleteAlbaran(m.albaranPadre.kalbaran),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    String criterioActual = criterios[indexCriterio].trim().toLowerCase();
+
+    Map<String, List<MovimientoVisual>> agrupados = {};
+    Map<String, String> etiquetasLegibles = {};
+
+    for (var m in datosNodo) {
+      String key = "";
+      String etiqueta = "";
+
+      switch (criterioActual) {
+        case 'finca':
+          key = m.idFinca;
+          etiqueta = m.nombreFinca;
+          break;
+        case 'cultivo':
+          key = m.idProducto;
+          etiqueta = m.nombreProducto;
+          break;
+        case 'almacen':
+          key = m.idAlmacen;
+          etiqueta = m.nombreAlmacen;
+          break;
+        case 'fecha':
+          key = "${m.fecha.year}-${m.fecha.month}-${m.fecha.day}";
+          etiqueta = '${m.fecha.day.toString().padLeft(2,'0')}/${m.fecha.month.toString().padLeft(2,'0')}/${m.fecha.year}';
+          break;
+        default:
+          key = "desconocido";
+          etiqueta = "Otros";
+      }
+      
+      // Aseguramos claves limpias ante posibles nulos locales
+      if (key.isEmpty) key = "vacio_$indexCriterio";
+      
+      agrupados.putIfAbsent(key, () => []).add(m);
+      etiquetasLegibles[key] = etiqueta;
+    }
+
+    return Column(
+      children: agrupados.entries.map((entry) {
+        final subLista = entry.value;
+        final subTotalKg = subLista.fold<double>(0, (sum, m) => sum + m.kg);
+        
+        String tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg';
+        if (criterioActual == 'finca' && subLista.isNotEmpty) {
+          tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg (${subLista.first.rendimientoM2.toStringAsFixed(1)} kg/m²)';
+        }
+
+        // CORRECCIÓN CRÍTICA DE CRASH: Llave inequívoca con prefijo de nivel
+        final String llaveUnica = "nivel_${indexCriterio}_${entry.key}_$criterioActual";
+
+        return Padding(
+          padding: const EdgeInsets.only(left: 4.0), // Sangrado sutil para mantener el orden sin desbordar el ancho
+          child: Theme(
+            // Eliminamos las salpicaduras de color y fondos raros que mete ExpansionTile por defecto
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: ValueKey(llaveUnica), // ValueKey con alcance controlado soluciona el crash de SliverMultiBox
+              shape: const Border(), // Quita la línea superior interna cuando está abierto
+              collapsedShape: const Border(), // Quita la línea cuando está cerrado
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              title: Text(
+                tituloFinal, 
+                style: indexCriterio == 0 
+                    ? Theme.of(context).textTheme.titleMedium // Primer nivel idéntico al original
+                    : Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500), // Subniveles estilizados
+              ),
+              children: [
+                _construirNivelDinamicamente(subLista, criterios, indexCriterio + 1),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
