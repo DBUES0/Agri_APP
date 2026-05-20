@@ -7,6 +7,7 @@ class Albaran {
   final String? idalbaranstr;
   final List<AlbaranDetalle> detalles;
   final List<Archivo> archivos;
+  final String ktipoalbaran; // <--- 1. AÑADE ESTA LÍNEA
 
   Albaran({
     required this.kalbaran,
@@ -17,6 +18,7 @@ class Albaran {
     this.idalbaranstr,
     required this.detalles,
     required this.archivos,
+    required this.ktipoalbaran, // <--- 2. AÑADE ESTA LÍNEA
   });
 
 factory Albaran.fromJson(Map<String, dynamic> json) {
@@ -27,6 +29,7 @@ factory Albaran.fromJson(Map<String, dynamic> json) {
       ktipodeprecio: json['ktipodeprecio'],
       comentarioStr: json['comentario_str'],
       idalbaranstr: json['idalbaran_str'],
+      ktipoalbaran: json['ktipoalbaran'] ?? 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', // <--- 3. AÑADE ESTA LÍNEA (Por defecto tipo Albarán)
       // Protegemos las listas por si vienen nulas desde PHP
       detalles: (json['detalles'] as List?)
               ?.map((item) => AlbaranDetalle.fromJson(item))
@@ -44,6 +47,7 @@ factory Albaran.fromJson(Map<String, dynamic> json) {
     'ktipodeprecio': ktipodeprecio,
     'comentario_str': comentarioStr,
     'idalbaran_str': idalbaranstr,
+    'ktipoalbaran': ktipoalbaran, // <--- 4. AÑADE ESTA LÍNEA
     // CRITICAL: Mapeamos las listas llamando al toJson de cada hijo
     'detalles': detalles.map((e) => e.toJson()).toList(),
     'archivos': archivos.map((e) => e.toJson()).toList(),

@@ -1881,13 +1881,11 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Fecha del último albarán donde se usó este producto
+        # REEMPLAZAR EL VIEJO CAMPO POR ESTE:
         ktipoalbaran:
           type: string
+          description: Vinculación directa con el tipo de documento (ALBARAN o GASTO)
           example: "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df"
-        tipoproducto_str:
-          type: string
-          example: "Hortalizas"
 
     # Actualizamos Almacen para incluir ktipoalbaran y evitar el error de Null Safety
     Almacen:

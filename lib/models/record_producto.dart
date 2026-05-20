@@ -1,48 +1,30 @@
-// MODELO: record_producto.dart
 class Producto {
   final String kproducto;
   final String productoStr;
   final DateTime fecha;
-  final String ktipoproducto;
-  final String tipoproductoStr;
-  
+  final String ktipoalbaran; // Vinculado al tipo de documento (Albarán o Gasto)
+
   Producto({
     required this.kproducto,
     required this.productoStr,
     required this.fecha,
-    required this.ktipoproducto,
-    required this.tipoproductoStr,
+    required this.ktipoalbaran,
   });
 
-  // factory Producto.fromJson(Map<String, dynamic> json) {
-  //   return Producto(
-  //     kproducto: json['kproducto'],
-  //     productoStr: json['producto_str'],
-  //     fecha: DateTime.parse(json['fecha_dtm']),
-  //     ktipoproducto: json['ktipoproducto'],
-  //     tipoproductoStr: json['tipoproducto_str'],
-  //   );
-  // }
+  factory Producto.fromJson(Map<String, dynamic> json) {
+    return Producto(
+      kproducto: json['kproducto'] ?? '',
+      productoStr: json['producto_str'] ?? '',
+      fecha: json['fecha_dtm'] != null ? DateTime.parse(json['fecha_dtm']) : DateTime.now(),
+      ktipoalbaran: json['ktipoalbaran'] ?? '', 
+    );
+  }
 
-  // En record_producto.dart
-factory Producto.fromJson(Map<String, dynamic> json) {
-  return Producto(
-    kproducto: json['kproducto'] ?? '',
-    productoStr: json['producto_str'] ?? 'Sin nombre',
-    // Si la fecha falla, ponemos la de hoy
-    fecha: DateTime.tryParse(json['fecha_dtm'] ?? '') ?? DateTime(1980,1,1),
-    // IMPORTANTE: Asegúrate de que el nombre coincide con el SELECT de tu PHP
-    ktipoproducto: json['ktipoproducto'] ?? json['ktipoalbaran'] ?? '', 
-    tipoproductoStr: json['tipoproducto_str'] ?? 'General',
-  );
-}
-
-Map<String, dynamic> toJson() => {
-  'kproducto': kproducto,
-  'producto_str': productoStr,
-  'fecha_dtm': fecha.toIso8601String(),
-  'ktipoproducto': ktipoproducto,
-  'tipoproducto_str': tipoproductoStr,
-};
-
+  // Soluciona el error 'undefined_method toJson' en page_carga.dart
+  Map<String, dynamic> toJson() => {
+        'kproducto': kproducto,
+        'producto_str': productoStr,
+        'fecha_dtm': fecha.toIso8601String(),
+        'ktipoalbaran': ktipoalbaran,
+      };
 }

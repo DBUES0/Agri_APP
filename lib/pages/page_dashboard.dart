@@ -582,6 +582,7 @@ Widget build(BuildContext context) {
                                 kalmacen: '',
                                 detalles: [],
                                 archivos: [],
+                                ktipoalbaran: 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df',
                               ),
                             );
 
@@ -622,8 +623,9 @@ Widget build(BuildContext context) {
                                             kproducto: '', 
                                             productoStr: 'Desconocido', 
                                             fecha: DateTime.now(),
-                                            ktipoproducto: '',      // <--- Nuevo campo obligatorio
-                                            tipoproductoStr: '',    // <--- Nuevo campo obligatorio
+                                            ktipoalbaran: '', // <--- Corregido el parámetro obligatorio
+                                            // ktipoproducto: '',      // <--- Nuevo campo obligatorio
+                                            // tipoproductoStr: '',    // <--- Nuevo campo obligatorio
                                           ),
                                         );
                                         
@@ -632,7 +634,8 @@ Widget build(BuildContext context) {
                                           // Mostramos la línea, el nombre del producto y los kg
                                           title: Text('Línea ${d.linea}: ${producto.productoStr} -> ${d.kg.toStringAsFixed(2)} kg',style:  Theme.of(context).textTheme.bodyMedium,),
                                           // Opcional: Podrías añadir el tipo de producto como subtítulo si quieres
-                                          subtitle: Text(producto.tipoproductoStr, style:  Theme.of(context).textTheme.bodySmall),//const TextStyle(fontSize: 10)),
+                                          // subtitle: Text(producto.tipoproductoStr, style:  Theme.of(context).textTheme.bodySmall),//const TextStyle(fontSize: 10)),
+                                          subtitle: const Text(''),
                                         );
                                       }).toList(),
                                     ),
@@ -695,9 +698,14 @@ Widget build(BuildContext context) {
           orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: 'Finca Desconocida', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
         );
 
-        final prodObj = widget.producto.firstWhere(
+       final prodObj = widget.producto.firstWhere(
           (p) => p.kproducto == det.kproducto,
-          orElse: () => Producto(kproducto: '', productoStr: 'Desconocido', fecha: DateTime.now(), ktipoproducto: '', tipoproductoStr: ''),
+          orElse: () => Producto(
+            kproducto: '', 
+            productoStr: 'Desconocido', 
+            fecha: DateTime.now(), 
+            ktipoalbaran: '', // <--- Cambiado al nuevo parámetro obligatorio
+          ),
         );
 
         final fincaM2 = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;

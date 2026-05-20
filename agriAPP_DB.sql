@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: localhost:3306
--- Tiempo de generación: 19-03-2026 a las 22:00:20
+-- Tiempo de generación: 20-05-2026 a las 21:11:37
 -- Versión del servidor: 10.11.11-MariaDB-0+deb12u1
 -- Versión de PHP: 8.2.28
 
@@ -47,16 +47,10 @@ CREATE TABLE `tblAgricultores` (
   `kidioma` uuid NOT NULL DEFAULT 'ac588b21-6ba1-11f0-ac9b-e2b6c6b4d8df',
   `ktipodeusuario` uuid DEFAULT NULL,
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
-  `fechaeliminacion_dtm` datetime DEFAULT NULL
+  `fechaeliminacion_dtm` datetime DEFAULT NULL,
+  `pref_agrupacion_str` varchar(100) DEFAULT 'finca,cultivo,fecha',
+  `pref_agrupacion_gastos_str` varchar(100) DEFAULT 'almacen,finca,fecha'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tblAgricultores`
---
-
-INSERT INTO `tblAgricultores` (`kagricultor`, `fechaCreacion_dtm`, `nombre_str`, `apellidos_str`, `dni_str`, `direccion_str`, `email_str`, `telefono_str`, `validado_bit`, `campo1_str`, `telegramid_str`, `password_str`, `activado_bit`, `bloqueado_bit`, `numintentos_int`, `ultimointentologin_dtm`, `kidioma`, `ktipodeusuario`, `eliminado_bit`, `fechaeliminacion_dtm`) VALUES
-('ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df', '2025-05-05 18:06:29', 'Agricultor de prueba', 'Fernez', '1234567a', 'calle la casa', 'correo@mentira.es', '1234567', b'1', NULL, '123456789', '123456', b'1', b'0', 0, '2025-05-05 18:16:57', 'ac588b21-6ba1-11f0-ac9b-e2b6c6b4d8df', 'e068546d-1912-11f0-9fba-e2b6c6b4d8df', b'0', NULL),
-('6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df', '2025-04-02 07:37:51', 'Prueba', 'Pruebez', '123456789x', '213', 'davidbueso@gmail.com', '619318257', b'1', NULL, NULL, '1234a*', NULL, b'0', 0, '2026-03-18 23:09:20', 'ac588b21-6ba1-11f0-ac9b-e2b6c6b4d8df', 'af7a6cb3-1912-11f0-9fba-e2b6c6b4d8df', b'0', NULL);
 
 -- --------------------------------------------------------
 
@@ -155,17 +149,6 @@ CREATE TABLE `tblalmacen` (
   `fechaeliminacion_dtm` datetime DEFAULT NULL,
   `kagricultor` uuid NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tblalmacen`
---
-
-INSERT INTO `tblalmacen` (`kalmacen`, `nombre_str`, `ktipoalbaran`, `fecha_dtm`, `eliminado_bit`, `fechaeliminacion_dtm`, `kagricultor`) VALUES
-('47876d3a-16d3-11f0-ab54-e2b6c6b4d8df', 'Almacen el pepeillo', 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', '2025-04-11 12:48:34', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('494e7d82-16d3-11f0-ab54-e2b6c6b4d8df', 'BuesoSol', 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', '2025-04-11 12:48:37', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('4ac2194b-67d5-11f0-ac9b-e2b6c6b4d8df', 'MABE', 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:57:02', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('4ac21a12-67d5-11f0-ac9b-e2b6c6b4d8df', 'Fertoal', 'c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:57:02', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('6f17c937-67d5-11f0-ac9b-e2b6c6b4d8df', 'MABE', 'c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:56:06', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df');
 
 -- --------------------------------------------------------
 
@@ -314,13 +297,6 @@ CREATE TABLE `tblidioma` (
   `Descripcion` varchar(500) DEFAULT NULL COMMENT '??'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `tblidioma`
---
-
-INSERT INTO `tblidioma` (`kidioma`, `Idioma`, `kagricultor`, `eliminado_bit`, `fechaeliminacion_dtm`, `Descripcion`) VALUES
-('ac588b21-6ba1-11f0-ac9b-e2b6c6b4d8df', 'ES-ES', 'ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df', b'0', NULL, NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -464,17 +440,6 @@ CREATE TABLE `tblproducto` (
   `ktipoproducto` uuid NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `tblproducto`
---
-
-INSERT INTO `tblproducto` (`kproducto`, `producto_str`, `ktipoalbaran`, `fecha_dtm`, `eliminado_bit`, `fechaeliminacion_dtm`, `ktipoproducto`) VALUES
-('7a7207b8-16de-11f0-ab54-e2b6c6b4d8df', 'Pimientos', 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', '2025-04-11 14:08:44', b'0', NULL, '944b113e-53d0-11f0-8f22-e2b6c6b4d8df'),
-('7fff6af4-16de-11f0-ab54-e2b6c6b4d8df', 'Tomates', 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', '2025-04-11 14:08:53', b'0', NULL, '944b113e-53d0-11f0-8f22-e2b6c6b4d8df'),
-('44bee507-67d4-11f0-ac9b-e2b6c6b4d8df', 'Fitosanitarios', 'c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:49:43', b'0', NULL, 'bd2800e0-53d0-11f0-8f22-e2b6c6b4d8df'),
-('58847b63-67d4-11f0-ac9b-e2b6c6b4d8df', 'Plastico', 'c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:50:16', b'0', NULL, 'bd2800e0-53d0-11f0-8f22-e2b6c6b4d8df'),
-('588c6cef-67d4-11f0-ac9b-e2b6c6b4d8df', 'Semilla', 'c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', '2025-07-23 14:50:16', b'0', NULL, 'bd2800e0-53d0-11f0-8f22-e2b6c6b4d8df');
-
 -- --------------------------------------------------------
 
 --
@@ -489,14 +454,6 @@ CREATE TABLE `tbltipoalbaran` (
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
   `fechaeliminacion_dtm` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tbltipoalbaran`
---
-
-INSERT INTO `tbltipoalbaran` (`ktipoalbaran`, `kagricultor`, `id_int`, `descripcion_str`, `eliminado_bit`, `fechaeliminacion_dtm`) VALUES
-('b42f149b-6744-11f0-ac9b-e2b6c6b4d8df', 'ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df', 1, 'ALBARAN', b'0', NULL),
-('c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df', 'ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df', 2, 'GASTO', b'0', NULL);
 
 -- --------------------------------------------------------
 
@@ -513,14 +470,6 @@ CREATE TABLE `tbltipodeprecio` (
   `fechaeliminacion_dtm` datetime DEFAULT NULL,
   `kagricultor` uuid NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tbltipodeprecio`
---
-
-INSERT INTO `tbltipodeprecio` (`ktipodeprecio`, `tipodeprecio_str`, `fecha_dtm`, `descripcion_str`, `eliminado_bit`, `fechaeliminacion_dtm`, `kagricultor`) VALUES
-('9753d840-1a42-11f0-9fba-e2b6c6b4d8df', 'Manual', '2025-04-15 21:42:55', 'El precio del detalle del albarán se rellenará manualmente', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('adb0827b-1a43-11f0-9fba-e2b6c6b4d8df', 'Semanal', '2025-04-15 21:50:42', 'Se aplica un precio semanal a cada tipo de producto', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df');
 
 -- --------------------------------------------------------
 
@@ -539,13 +488,6 @@ CREATE TABLE `tbltipogasto` (
   `fechaeliminacion_dtm` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `tbltipogasto`
---
-
-INSERT INTO `tbltipogasto` (`ktipogasto`, `tipogasto_str`, `descripcion_str`, `fecha_dtm`, `fechamodificacion_dtm`, `kagricultor`, `eliminado_bit`, `fechaeliminacion_dtm`) VALUES
-('1507519f-1978-11f0-9fba-e2b6c6b4d8df', 'Sin definir', 'Sin definir', '2025-04-14 21:33:18', '2025-04-14 21:33:18', '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df', b'0', NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -563,14 +505,6 @@ CREATE TABLE `tbltipooperacion` (
   `fechaeliminacion_dtm` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `tbltipooperacion`
---
-
-INSERT INTO `tbltipooperacion` (`ktipooperacion`, `tipooperacion_str`, `descripcion_str`, `fecha_dtm`, `fechamodificacion_dtm`, `kagricultor`, `eliminado_bit`, `fechaeliminacion_dtm`) VALUES
-('ed04effc-1976-11f0-9fba-e2b6c6b4d8df', 'Sin definir', 'Operacion sin asisgnar a ninguna operación en particular', '2025-04-14 21:25:02', '2025-04-14 21:25:02', '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df', b'0', NULL),
-('0c736eca-1977-11f0-9fba-e2b6c6b4d8df', 'Regar', 'Riego', '2025-04-14 21:25:54', '2025-04-14 21:25:54', '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df', b'0', NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -586,14 +520,6 @@ CREATE TABLE `tbltipoproducto` (
   `kagricultor` uuid DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `tbltipoproducto`
---
-
-INSERT INTO `tbltipoproducto` (`ktipoproducto`, `descripcion_str`, `fechacreacion_dtm`, `eliminado_int`, `fechaeliminacion_dtm`, `kagricultor`) VALUES
-('944b113e-53d0-11f0-8f22-e2b6c6b4d8df', 'Hortalizas', '2026-02-17 22:26:34', b'0', NULL, 'ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df'),
-('bd2800e0-53d0-11f0-8f22-e2b6c6b4d8df', 'Gastos', '2026-02-17 22:27:43', b'0', NULL, 'ab6cb5c7-29db-11f0-8a69-e2b6c6b4d8df');
-
 -- --------------------------------------------------------
 
 --
@@ -607,14 +533,6 @@ CREATE TABLE `tbltiposdeusuario` (
   `fechaeliminacion_dtm` datetime DEFAULT NULL,
   `kagricultor` uuid DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tbltiposdeusuario`
---
-
-INSERT INTO `tbltiposdeusuario` (`ktipodeusuario`, `descripcion_str`, `eliminado_bit`, `fechaeliminacion_dtm`, `kagricultor`) VALUES
-('af7a6cb3-1912-11f0-9fba-e2b6c6b4d8df', 'Administrador Total', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df'),
-('e068546d-1912-11f0-9fba-e2b6c6b4d8df', 'Usuario', b'0', NULL, '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df');
 
 -- --------------------------------------------------------
 

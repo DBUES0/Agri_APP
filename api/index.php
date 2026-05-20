@@ -655,15 +655,16 @@ $app->get('/api/productos', function (Request $request, Response $response, arra
                 tp.kproducto, 
                 tp.producto_str, 
                 MAX(ta.fecha_dtm) AS ufecha_ultimo_uso_dtm,
-                tp.ktipoproducto,
-                ttp.descripcion_str as tipoproducto_str
+                tp.ktipoalbaran,
+                tta.descripcion_str as tipoproducto_str
             FROM tblproducto tp
             LEFT JOIN tblalbarandetalle tad ON tp.kproducto = tad.kproducto
             LEFT JOIN tblalbaran ta ON tad.kalbaran = ta.kalbaran 
                 AND ta.kagricultor = ?
-            inner join tbltipoproducto ttp on tp.ktipoproducto = ttp.ktipoproducto
+            inner join tbltipoalbaran tta on ta.ktipoalbaran = tta.ktipoalbaran
+            -- inner join tbltipoproducto tp.ktipoproducto = ttp.ktipoproducto
             WHERE (tp.eliminado_bit IS NULL OR tp.eliminado_bit = b'0')
-            GROUP BY tp.kproducto, tp.producto_str, tp.ktipoproducto
+            GROUP BY tp.kproducto, tp.producto_str, tp.ktipoalbaran
             ORDER BY 
                 MAX(ta.fecha_dtm) IS NULL ASC, 
                 MAX(ta.fecha_dtm) DESC, 
