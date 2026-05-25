@@ -465,6 +465,26 @@ Widget build(BuildContext context) {
           children: [
             _buildAlbaranesSection(), // Tarjeta 1 (Original)
             _buildAlbaranes2Section(), // Tarjeta 2 (Zona de pruebas dinámica)
+            _buildSection(
+              'Gastos', 
+              onAdd: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PageAlbaran(
+                      almacenes: widget.almacen,
+                      tiposPrecio: widget.tipodeprecio,
+                      productos: widget.producto,
+                      fincas: widget.fincas,
+                      albaranesTotales: _albaranes,
+                      // CLAVE: Inyectamos el UUID de Gasto de tu BD para que mute el formulario automáticamente
+                      ktipoalbaran: "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df", 
+                    ),
+                  ),
+                );
+                if (result == true) { _refreshAlbaranes(); }
+              }
+            ),
             _buildSection('Gastos', onAdd: () {}),
             _buildSection('Operaciones', onAdd: () {}),
             _buildSection('Jornadas', onAdd: () {}, extra: const Text("Último día: 2025/05/19")),
@@ -505,7 +525,7 @@ Widget build(BuildContext context) {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
+            'Albaranes (Antiguo): ${totalKg.toStringAsFixed(2)} kg', 
             style: Theme.of(context).textTheme.titleLarge,
           ),
           IconButton(
@@ -683,30 +703,25 @@ Widget build(BuildContext context) {
   // ==========================================================================
 
   /// 1. Aplana la estructura de Albaranes -> Detalles a una lista independiente
-  List<MovimientoVisual> _aplanarMovimientos() {
+List<MovimientoVisual> _aplanarMovimientos() {
     List<MovimientoVisual> listaPlana = [];
 
+    // INDEXACIÓN EXPRESO (O(1)): Convertimos listas a Mapas antes de iterar
+    final Map<String, Almacen> mapAlmacenes = {for (var a in widget.almacen) a.kalmacen: a};
+    final Map<String, finca> mapFincas = {for (var f in widget.fincas) f.kfinca: f};
+    final Map<String, Producto> mapProductos = {for (var p in widget.producto) p.kproducto: p};
+
     for (var alb in _albaranes) {
-      final almObj = widget.almacen.firstWhere(
-        (a) => a.kalmacen == alb.kalmacen,
-        orElse: () => Almacen(kalmacen: '', nombreStr: 'Sin Almacén', fecha: DateTime.now(), kagricultor: '', ktipoalbaran: ''),
-      );
+      // Búsqueda directa instantánea sin recorrer la lista entera
+      final almObj = mapAlmacenes[alb.kalmacen] ?? 
+          Almacen(kalmacen: '', nombreStr: 'Sin Almacén', fecha: DateTime.now(), kagricultor: '', ktipoalbaran: '');
 
       for (var det in alb.detalles) {
-        final fincaObj = widget.fincas.firstWhere(
-          (f) => f.kfinca == det.kfinca,
-          orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: 'Finca Desconocida', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
-        );
+        final fincaObj = mapFincas[det.kfinca] ?? 
+            finca(kfinca: '', kfincapadre: '', nombreStr: 'Finca Desconocida', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now());
 
-       final prodObj = widget.producto.firstWhere(
-          (p) => p.kproducto == det.kproducto,
-          orElse: () => Producto(
-            kproducto: '', 
-            productoStr: 'Desconocido', 
-            fecha: DateTime.now(), 
-            ktipoalbaran: '', // <--- Cambiado al nuevo parámetro obligatorio
-          ),
-        );
+        final prodObj = mapProductos[det.kproducto] ?? 
+            Producto(kproducto: '', productoStr: 'Desconocido', fecha: DateTime.now(), ktipoalbaran: '');
 
         final fincaM2 = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
 
@@ -727,6 +742,51 @@ Widget build(BuildContext context) {
     }
     return listaPlana;
   }
+
+  // List<MovimientoVisual> _aplanarMovimientos() {
+  //   List<MovimientoVisual> listaPlana = [];
+
+  //   for (var alb in _albaranes) {
+  //     final almObj = widget.almacen.firstWhere(
+  //       (a) => a.kalmacen == alb.kalmacen,
+  //       orElse: () => Almacen(kalmacen: '', nombreStr: 'Sin Almacén', fecha: DateTime.now(), kagricultor: '', ktipoalbaran: ''),
+  //     );
+
+  //     for (var det in alb.detalles) {
+  //       final fincaObj = widget.fincas.firstWhere(
+  //         (f) => f.kfinca == det.kfinca,
+  //         orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: 'Finca Desconocida', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
+  //       );
+
+  //      final prodObj = widget.producto.firstWhere(
+  //         (p) => p.kproducto == det.kproducto,
+  //         orElse: () => Producto(
+  //           kproducto: '', 
+  //           productoStr: 'Desconocido', 
+  //           fecha: DateTime.now(), 
+  //           ktipoalbaran: '', // <--- Cambiado al nuevo parámetro obligatorio
+  //         ),
+  //       );
+
+  //       final fincaM2 = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+
+  //       listaPlana.add(MovimientoVisual(
+  //         idFinca: det.kfinca,
+  //         nombreFinca: fincaObj.nombreStr,
+  //         idProducto: det.kproducto,
+  //         nombreProducto: prodObj.productoStr,
+  //         idAlmacen: alb.kalmacen,
+  //         nombreAlmacen: almObj.nombreStr,
+  //         fecha: alb.fecha,
+  //         kg: det.kg,
+  //         rendimientoM2: det.kg / fincaM2,
+  //         albaranPadre: alb,
+  //         detalleOriginal: det,
+  //       ));
+  //     }
+  //   }
+  //   return listaPlana;
+  // }
 
   /// 2. Construye la tarjeta contenedora de Albaranes 2
   // Widget _buildAlbaranes2Section() {
@@ -861,7 +921,7 @@ Widget _buildAlbaranes2Section() {
                 children: [
                   Expanded(
                     child: Text(
-                      'Albaranes (Dinámico): ${totalKg.toStringAsFixed(2)} kg', 
+                      'Albaranes: ${totalKg.toStringAsFixed(2)} kg', 
                       style: Theme.of(context).textTheme.titleLarge,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -884,16 +944,127 @@ Widget _buildAlbaranes2Section() {
 }
   /// 3. Función recursiva encargada de anidar ExpansionTiles dinámicamente
 /// 3. Función recursiva de anidamiento limpia (Corrige Crash de Scroll y Estética)
+  // Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<String> criterios, int indexCriterio) {
+  //   // CONDICIÓN TERMINAL: Renderizado de las hojas finales (Líneas de producto)
+  //   if (indexCriterio >= criterios.length) {
+  //     return Column(
+  //       children: datosNodo.map((m) {
+  //         return ListTile(
+  //           dense: true,
+  //           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+  //           title: Text(
+  //             'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ${m.kg.toStringAsFixed(2)} kg',
+  //             style: Theme.of(context).textTheme.bodyMedium,
+  //           ),
+  //           subtitle: Text(
+  //             'Doc: ${m.albaranPadre.idalbaranstr} | Almacén: ${m.nombreAlmacen}',
+  //             style: Theme.of(context).textTheme.bodySmall,
+  //           ),
+  //           trailing: Row(
+  //             mainAxisSize: MainAxisSize.min,
+  //             children: [
+  //               IconButton(
+  //                 icon: const Icon(Icons.edit, size: 20, color: AgriPalette.greenMain),
+  //                 onPressed: () => _goToAlbaran(albaran: m.albaranPadre),
+  //               ),
+  //               IconButton(
+  //                 icon: const Icon(Icons.delete, size: 20, color: AgriPalette.greenMain),
+  //                 onPressed: () => _confirmDeleteAlbaran(m.albaranPadre.kalbaran),
+  //               ),
+  //             ],
+  //           ),
+  //         );
+  //       }).toList(),
+  //     );
+  //   }
+
+  //   String criterioActual = criterios[indexCriterio].trim().toLowerCase();
+
+  //   Map<String, List<MovimientoVisual>> agrupados = {};
+  //   Map<String, String> etiquetasLegibles = {};
+
+  //   for (var m in datosNodo) {
+  //     String key = "";
+  //     String etiqueta = "";
+
+  //     switch (criterioActual) {
+  //       case 'finca':
+  //         key = m.idFinca;
+  //         etiqueta = m.nombreFinca;
+  //         break;
+  //       case 'cultivo':
+  //         key = m.idProducto;
+  //         etiqueta = m.nombreProducto;
+  //         break;
+  //       case 'almacen':
+  //         key = m.idAlmacen;
+  //         etiqueta = m.nombreAlmacen;
+  //         break;
+  //       case 'fecha':
+  //         key = "${m.fecha.year}-${m.fecha.month}-${m.fecha.day}";
+  //         etiqueta = '${m.fecha.day.toString().padLeft(2,'0')}/${m.fecha.month.toString().padLeft(2,'0')}/${m.fecha.year}';
+  //         break;
+  //       default:
+  //         key = "desconocido";
+  //         etiqueta = "Otros";
+  //     }
+      
+  //     // Aseguramos claves limpias ante posibles nulos locales
+  //     if (key.isEmpty) key = "vacio_$indexCriterio";
+      
+  //     agrupados.putIfAbsent(key, () => []).add(m);
+  //     etiquetasLegibles[key] = etiqueta;
+  //   }
+
+  //   return Column(
+  //     children: agrupados.entries.map((entry) {
+  //       final subLista = entry.value;
+  //       final subTotalKg = subLista.fold<double>(0, (sum, m) => sum + m.kg);
+        
+  //       String tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg';
+  //       if (criterioActual == 'finca' && subLista.isNotEmpty) {
+  //         tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg (${subLista.first.rendimientoM2.toStringAsFixed(1)} kg/m²)';
+  //       }
+
+  //       // CORRECCIÓN CRÍTICA DE CRASH: Llave inequívoca con prefijo de nivel
+  //       final String llaveUnica = "nivel_${indexCriterio}_${entry.key}_$criterioActual";
+
+  //       return Padding(
+  //         padding: const EdgeInsets.only(left: 4.0), // Sangrado sutil para mantener el orden sin desbordar el ancho
+  //         child: Theme(
+  //           // Eliminamos las salpicaduras de color y fondos raros que mete ExpansionTile por defecto
+  //           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+  //           child: ExpansionTile(
+  //             key: ValueKey(llaveUnica), // ValueKey con alcance controlado soluciona el crash de SliverMultiBox
+  //             shape: const Border(), // Quita la línea superior interna cuando está abierto
+  //             collapsedShape: const Border(), // Quita la línea cuando está cerrado
+  //             tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+  //             title: Text(
+  //               tituloFinal, 
+  //               style: indexCriterio == 0 
+  //                   ? Theme.of(context).textTheme.titleMedium // Primer nivel idéntico al original
+  //                   : Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500), // Subniveles estilizados
+  //             ),
+  //             children: [
+  //               _construirNivelDinamicamente(subLista, criterios, indexCriterio + 1),
+  //             ],
+  //           ),
+  //         ),
+  //       );
+  //     }).toList(),
+  //   );
+  // }
+/// 3. Función recursiva encargada de anidar ExpansionTiles dinámicamente (Cálculo de Totales corregido)
   Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<String> criterios, int indexCriterio) {
-    // CONDICIÓN TERMINAL: Renderizado de las hojas finales (Líneas de producto)
+    // CONDICIÓN TERMINAL: Si ya procesamos las agrupaciones, pintamos las hojas (las líneas) con sus acciones
     if (indexCriterio >= criterios.length) {
       return Column(
         children: datosNodo.map((m) {
           return ListTile(
             dense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            leading: const Icon(Icons.arrow_right, color: AgriPalette.greyMain),
             title: Text(
-              'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ${m.kg.toStringAsFixed(2)} kg',
+              'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ${m.kg.toStringAsFixed(1)} kg',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             subtitle: Text(
@@ -920,6 +1091,7 @@ Widget _buildAlbaranes2Section() {
 
     String criterioActual = criterios[indexCriterio].trim().toLowerCase();
 
+    // Agrupación dinámica por el criterio del nivel actual
     Map<String, List<MovimientoVisual>> agrupados = {};
     Map<String, String> etiquetasLegibles = {};
 
@@ -930,7 +1102,7 @@ Widget _buildAlbaranes2Section() {
       switch (criterioActual) {
         case 'finca':
           key = m.idFinca;
-          etiqueta = m.nombreFinca;
+          etiqueta = m.nombreFinca; // Dejamos solo el nombre limpio, el total va al final
           break;
         case 'cultivo':
           key = m.idProducto;
@@ -949,7 +1121,6 @@ Widget _buildAlbaranes2Section() {
           etiqueta = "Otros";
       }
       
-      // Aseguramos claves limpias ante posibles nulos locales
       if (key.isEmpty) key = "vacio_$indexCriterio";
       
       agrupados.putIfAbsent(key, () => []).add(m);
@@ -962,28 +1133,40 @@ Widget _buildAlbaranes2Section() {
         final subTotalKg = subLista.fold<double>(0, (sum, m) => sum + m.kg);
         
         String tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg';
-        if (criterioActual == 'finca' && subLista.isNotEmpty) {
-          tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg (${subLista.first.rendimientoM2.toStringAsFixed(1)} kg/m²)';
+        
+        // --- CORRECCIÓN QUIRÚRGICA DEL RENDIMIENTO M² ---
+        // Si el criterio que estamos pintando en este nivel es 'finca', calculamos el rendimiento real de TODO el nodo
+        if (criterioActual == 'finca') {
+          final fincaObj = widget.fincas.firstWhere(
+            (f) => f.kfinca == entry.key,
+            orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: '', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
+          );
+          
+          // Conseguimos los metros de la finca actualizando las salvaguardas
+          final double areaFinca = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+          
+          // CÁLCULO REAL: La suma de todos los kilos acumulados en este nodo / el área real de la finca
+          final double rendimientoReal = subTotalKg / areaFinca;
+          
+          tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg (${rendimientoReal.toStringAsFixed(1)} kg/m²)';
         }
 
-        // CORRECCIÓN CRÍTICA DE CRASH: Llave inequívoca con prefijo de nivel
         final String llaveUnica = "nivel_${indexCriterio}_${entry.key}_$criterioActual";
 
         return Padding(
-          padding: const EdgeInsets.only(left: 4.0), // Sangrado sutil para mantener el orden sin desbordar el ancho
+          padding: const EdgeInsets.only(left: 4.0), 
           child: Theme(
-            // Eliminamos las salpicaduras de color y fondos raros que mete ExpansionTile por defecto
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              key: ValueKey(llaveUnica), // ValueKey con alcance controlado soluciona el crash de SliverMultiBox
-              shape: const Border(), // Quita la línea superior interna cuando está abierto
-              collapsedShape: const Border(), // Quita la línea cuando está cerrado
+              key: ValueKey(llaveUnica), 
+              shape: const Border(), 
+              collapsedShape: const Border(), 
               tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               title: Text(
                 tituloFinal, 
                 style: indexCriterio == 0 
-                    ? Theme.of(context).textTheme.titleMedium // Primer nivel idéntico al original
-                    : Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500), // Subniveles estilizados
+                    ? Theme.of(context).textTheme.titleMedium 
+                    : Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500), 
               ),
               children: [
                 _construirNivelDinamicamente(subLista, criterios, indexCriterio + 1),

@@ -1,5 +1,6 @@
 /// Modelo de datos que representa a un usuario del sistema.
 class Usuario {
+  final String kagricultor; // <--- 1. IDENTIFICADOR ÚNICO DE LA BASE DE DATOS
   final String nombre;
   final String apellidos;
   final String dni;
@@ -15,6 +16,7 @@ class Usuario {
   final String prefAgrupacionGastos; // Criterio dinámico de agrupación de gastos (separado por comas)
 
   Usuario({
+    required this.kagricultor, // <--- 2. REQUERIDO EN EL CONSTRUCTOR
     required this.nombre,
     required this.apellidos,
     required this.dni,
@@ -34,25 +36,26 @@ class Usuario {
   /// Maneja la conversión de nombres de columnas de BD (ej. `_str`, `_bit`) a propiedades Dart.
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
-      // Uso de ?? '' para evitar nulos si el campo no viene en el JSON
+      // 3. CAPTURAMOS EL UUID QUE ENVÍA TU API AL HACER LOGIN
+      kagricultor: json['kagricultor'] ?? '', 
       nombre: json['nombre_str'] ?? '',
       apellidos: json['apellidos_str'] ?? '',
       dni: json['dni_str'] ?? '',
       direccion: json['direccion_str'] ?? '',
       email: json['email_str'] ?? '',
       telefono: json['telefono_str'] ?? '',
-      // Conversión de entero (bit) a booleano: 1 es true, cualquier otra cosa es false
       validado: json['validado_bit'] == 1,
       bloqueado: json['bloqueado_bit'] == 1,
       intentos: json['numintentos_int'] ?? 0,
-      // Nota: Se mantiene como String, considerar DateTime.parse() si se requiere operar con fechas
       ultimoIntento: json['ultimointentologin_dtm'] ?? '',
       tipoUsuario: json['ktipodeusuario'] ?? '',
       prefAgrupacion: json['pref_agrupacion_str'] ?? '',
       prefAgrupacionGastos: json['pref_agrupacion_gastos_str'] ?? ''
     );
   }
+
   Map<String, dynamic> toJson() => {
+        'kagricultor': kagricultor, // <--- 4. ADICIÓN EN EL CONTROLADOR JSON
         'nombre_str': nombre,
         'apellidos_str': apellidos,
         'dni_str': dni,

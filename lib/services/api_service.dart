@@ -16,8 +16,8 @@ import 'dart:async';
 class ApiService {
   // Esta es la dirección de tu servidor. 
   // Al tenerla aquí, si un día cambia, solo la editas en un sitio.
-  static const String baseUrl = 'https://api.bueso.duckdns.org/api';
-
+//  static const String baseUrl = 'https://api.bueso.duckdns.org/api';
+static const String baseUrl = 'https://api.bueso.online/api';
   // --- MÉTODOS DE APOYO (HELPERS) ---
 
   // Obtiene el token que guardamos en el móvil al hacer login

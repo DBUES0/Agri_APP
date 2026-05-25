@@ -391,48 +391,91 @@ Future<void> _iniciarApp() async {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AgriPalette.background,
-      body: Padding(
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AgriPalette.background, // O el color de fondo limpio que uses
+    body: Center( // <-- Obliga al contenedor a centrarse en la pantalla
+      child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center, // Centrado Vertical
+          crossAxisAlignment: CrossAxisAlignment.center, // Centrado Horizontal
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Spacer(flex: 2),
-            
-            // Logo y Estilo idéntico a tu Login
-            AppTheme.buildLogo(fontSize: 48),
+            AppTheme.buildLogo(fontSize: 45), // Tu logo mixto escalado para la carga
             const SizedBox(height: 10),
             Text(
-              "AgriAPP",
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2.0,
-              ),
+              'AgriAPP',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AgriPalette.greyMain,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
             ),
-            
-            const SizedBox(height: 60),
-            
-            // Indicador de carga armonizado
+            const SizedBox(height: 40), // Espacio elegante antes del indicador
             const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(AgriPalette.greenMain),
-              strokeWidth: 3,
             ),
-            
             const SizedBox(height: 20),
-            
             Text(
-              _mensajeStatus,
+              _mensajeStatus, // La variable dinámica que muestra "Sincronizando fincas..."
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AgriPalette.greyMain.withValues(alpha: 0.7),
-              ),
+                    color: AgriPalette.greyMain.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                  ),
+              textAlign: TextAlign.center,
             ),
-
-            const Spacer(flex: 6),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+  // @override
+  // Widget build(BuildContext context) {
+  //   return Scaffold(
+  //     backgroundColor: AgriPalette.background,
+  //     body: Padding(
+  //       padding: const EdgeInsets.all(24.0),
+  //       child: Column(
+  //         children: [
+  //           const Spacer(flex: 2),
+            
+  //           // Logo y Estilo idéntico a tu Login
+  //           AppTheme.buildLogo(fontSize: 48),
+  //           const SizedBox(height: 10),
+  //           Text(
+  //             "AgriAPP",
+  //             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+  //               fontWeight: FontWeight.bold,
+  //               letterSpacing: 2.0,
+  //             ),
+  //           ),
+            
+  //           const SizedBox(height: 60),
+            
+  //           // Indicador de carga armonizado
+  //           const CircularProgressIndicator(
+  //             valueColor: AlwaysStoppedAnimation<Color>(AgriPalette.greenMain),
+  //             strokeWidth: 3,
+  //           ),
+            
+  //           const SizedBox(height: 20),
+            
+  //           Text(
+  //             _mensajeStatus,
+  //             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+  //               color: AgriPalette.greyMain.withValues(alpha: 0.7),
+  //             ),
+  //           ),
+
+  //           const Spacer(flex: 6),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
 }

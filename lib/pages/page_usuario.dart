@@ -8,9 +8,12 @@ import '../models/record_tipogasto.dart';
 import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
-import '../pages/page_dashboard.dart'; // <-- IMPORTANTE
+import '../pages/page_dashboard.dart'; 
+import '../services/api_service.dart'; 
+import '../utils/app_palette.dart';
+import '../utils/ui_utils.dart';
 
-class UsuarioPage extends StatelessWidget {
+class UsuarioPage extends StatefulWidget {
   final Usuario usuario;
   final List<finca> fincas;
   final List<Tipogasto> tiposGasto;
@@ -35,45 +38,244 @@ class UsuarioPage extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<UsuarioPage> createState() => _UsuarioPageState();
+}
+
+class _UsuarioPageState extends State<UsuarioPage> {
+  final ApiService _apiService = ApiService();
+
+  final Map<String, String> _opcionesOrdenacion = {
+    "finca,cultivo,fecha": "Finca > Cultivo > Fecha",
+    "cultivo,finca,fecha": "Cultivo > Finca > Fecha",
+    "almacen,cultivo,finca,fecha": "Almacén > Cultivo > Finca > Fecha",
+    "almacen,finca,fecha": "Almacén > Finca > Fecha",
+    "fecha,cultivo,finca": "Fecha > Cultivo > Finca",
+    "Fecha,finca,cultivo": "Fecha > Finca > Cultivo",
+  };
+
+  String? _prefAlbaranes;
+  String? _prefGastos;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefAlbaranes = widget.usuario.prefAgrupacion.isEmpty ? "finca,cultivo,fecha" : widget.usuario.prefAgrupacion;
+    _prefGastos = widget.usuario.prefAgrupacionGastos.isEmpty ? "almacen,cultivo,fecha" : widget.usuario.prefAgrupacionGastos;
+
+    if (!_opcionesOrdenacion.containsKey(_prefAlbaranes)) _prefAlbaranes = "finca,cultivo,fecha";
+    if (!_opcionesOrdenacion.containsKey(_prefGastos)) _prefGastos = "almacen,cultivo,fecha";
+  }
+
+  // --- BOTÓN CANCELAR: Regresa al Dashboard con los datos originales (Sin Salvar) ---
+  void _volverSinGuardar() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DashboardPage(
+          usuario: widget.usuario, // Enviamos el usuario original intacto
+          fincas: widget.fincas,
+          tiposGasto: widget.tiposGasto,
+          almacen: widget.almacen,
+          producto: widget.producto,
+          tipodeprecio: widget.tipodeprecio,
+          tipooperacion: widget.tipooperacion,
+          trabajador: widget.trabajador,
+          albaranes: widget.albaranes,
+        ),
+      ),
+    );
+  }
+
+  // Future<void> _guardarCambiosYContinuar() async {
+  //   try {
+  //     final Map<String, dynamic> datosModificados = {
+  //       'pref_agrupacion_str': _prefAlbaranes,
+  //       'pref_agrupacion_gastos_str': _prefGastos,
+  //     };
+
+  //     // CORRECCIÓN CRÍTICA: Cambiado 'tblagricultores' a 'tblAgricultores' (Respeta Mayúsculas en Linux)
+  //     await _apiService.putGeneric('tblAgricultores', widget.usuario.dni, datosModificados);
+
+  //     final usuarioActualizado = Usuario(
+  //       nombre: widget.usuario.nombre,
+  //       apellidos: widget.usuario.apellidos,
+  //       dni: widget.usuario.dni,
+  //       direccion: widget.usuario.direccion,
+  //       email: widget.usuario.email,
+  //       telefono: widget.usuario.telefono,
+  //       validado: widget.usuario.validado,
+  //       bloqueado: widget.usuario.bloqueado,
+  //       intentos: widget.usuario.intentos,
+  //       ultimoIntento: widget.usuario.ultimoIntento,
+  //       tipoUsuario: widget.usuario.tipoUsuario,
+  //       prefAgrupacion: _prefAlbaranes ?? 'finca,cultivo,fecha',
+  //       prefAgrupacionGastos: _prefGastos ?? 'almacen,cultivo,fecha',
+  //     );
+
+  //     if (!mounted) return;
+  //     mensajeEmergente(context, 'Preferencias actualizadas');
+
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => DashboardPage(
+  //           usuario: usuarioActualizado, 
+  //           fincas: widget.fincas,
+  //           tiposGasto: widget.tiposGasto,
+  //           almacen: widget.almacen,
+  //           producto: widget.producto,
+  //           tipodeprecio: widget.tipodeprecio,
+  //           tipooperacion: widget.tipooperacion,
+  //           trabajador: widget.trabajador,
+  //           albaranes: widget.albaranes,
+  //         ),
+  //       ),
+  //     );
+  //   } catch (e) {
+  //     mensajeEmergente(context, 'Error al guardar configuración: $e', tipo: 'error');
+  //   }
+  // }
+
+Future<void> _guardarCambiosYContinuar() async {
+    try {
+      final Map<String, dynamic> datosModificados = {
+        'pref_agrupacion_str': _prefAlbaranes,
+        'pref_agrupacion_gastos_str': _prefGastos,
+      };
+
+      // CORRECCIÓN SUTIL PERO VITAL: 
+      // 1. Usamos 'tblAgricultores' respetando la mayúscula de producción.
+      // 2. Cambiamos 'widget.usuario.dni' por 'widget.usuario.kagricultor' (el UUID primario).
+      await _apiService.putGeneric('tblAgricultores', widget.usuario.kagricultor, datosModificados);
+
+      // Creamos el clon actualizado para el Dashboard
+      final usuarioActualizado = Usuario(
+        kagricultor: widget.usuario.kagricultor, // Conservamos el UUID
+        nombre: widget.usuario.nombre,
+        apellidos: widget.usuario.apellidos,
+        dni: widget.usuario.dni,
+        direccion: widget.usuario.direccion,
+        email: widget.usuario.email,
+        telefono: widget.usuario.telefono,
+        validado: widget.usuario.validado,
+        bloqueado: widget.usuario.bloqueado,
+        intentos: widget.usuario.intentos,
+        ultimoIntento: widget.usuario.ultimoIntento,
+        tipoUsuario: widget.usuario.tipoUsuario,
+        prefAgrupacion: _prefAlbaranes ?? 'finca,cultivo,fecha',
+        prefAgrupacionGastos: _prefGastos ?? 'almacen,cultivo,fecha',
+      );
+
+      if (!mounted) return;
+      mensajeEmergente(context, 'Preferencias actualizadas');
+
+      // Volvemos al Dashboard con los datos en orden
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DashboardPage(
+            usuario: usuarioActualizado, 
+            fincas: widget.fincas,
+            tiposGasto: widget.tiposGasto,
+            almacen: widget.almacen,
+            producto: widget.producto,
+            tipodeprecio: widget.tipodeprecio,
+            tipooperacion: widget.tipooperacion,
+            trabajador: widget.trabajador,
+            albaranes: widget.albaranes,
+          ),
+        ),
+      );
+    } catch (e) {
+      // Si hay un error de red (como el SocketException de DuckDNS), saltará aquí
+      print("Error detallado al guardar: $e");
+      mensajeEmergente(context, 'Error al guardar configuración: $e', tipo: 'error');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Datos del Usuario')),
+      appBar: AppBar(
+        title: const Text('Configuración del Perfil'),
+        // Añadimos botón físico de escape en la esquina superior izquierda
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _volverSinGuardar,
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            Text('Nombre: ${usuario.nombre}'),
-            Text('Apellidos: ${usuario.apellidos}'),
-            Text('DNI: ${usuario.dni}'),
-            Text('Dirección: ${usuario.direccion}'),
-            Text('Email: ${usuario.email}'),
-            Text('Teléfono: ${usuario.telefono}'),
-            Text('Validado: ${usuario.validado ? 'Sí' : 'No'}'),
-            Text('Bloqueado: ${usuario.bloqueado ? 'Sí' : 'No'}'),
-            Text('Intentos Fallidos: ${usuario.intentos}'),
-            Text('Último intento: ${usuario.ultimoIntento}'),
-            Text('Tipo Usuario: ${usuario.tipoUsuario}'),
+            Text('Nombre: ${widget.usuario.nombre}', style: const TextStyle(fontSize: 16)),
+            Text('Apellidos: ${widget.usuario.apellidos}', style: const TextStyle(fontSize: 16)),
+            Text('DNI: ${widget.usuario.dni}'),
+            Text('Dirección: ${widget.usuario.direccion}'),
+            Text('Email: ${widget.usuario.email}'),
+            Text('Teléfono: ${widget.usuario.telefono}'),
+            Text('Tipo Usuario: ${widget.usuario.tipoUsuario}'),
+            
+            const SizedBox(height: 30),
+            Text(
+              'Preferencias de Organización', 
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AgriPalette.greenMain)
+            ),
+            const Divider(),
+            const SizedBox(height: 10),
+
+            DropdownButtonFormField<String>(
+              value: _prefAlbaranes,
+              decoration: const InputDecoration(
+                labelText: 'Estructura de Albaranes (Ingresos)',
+                border: OutlineInputBorder(),
+              ),
+              items: _opcionesOrdenacion.entries.map((e) => DropdownMenuItem(
+                value: e.key,
+                child: Text(e.value),
+              )).toList(),
+              onChanged: (v) => setState(() => _prefAlbaranes = v),
+            ),
+
             const SizedBox(height: 20),
+
+            DropdownButtonFormField<String>(
+              value: _prefGastos,
+              decoration: const InputDecoration(
+                labelText: 'Estructura de Gastos (Egresos)',
+                border: OutlineInputBorder(),
+              ),
+              items: _opcionesOrdenacion.entries.map((e) => DropdownMenuItem(
+                value: e.key,
+                child: Text(e.value),
+              )).toList(),
+              onChanged: (v) => setState(() => _prefGastos = v),
+            ),
+
+            const SizedBox(height: 40),
+            
             ElevatedButton(
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DashboardPage(
-                      usuario: usuario,
-                      fincas: fincas,
-                      tiposGasto: tiposGasto,
-                      almacen: almacen,
-                      producto: producto,
-                      tipodeprecio: tipodeprecio,
-                      tipooperacion: tipooperacion,
-                      trabajador: trabajador,
-                      albaranes: albaranes,
-                    ),
-                  ),
-                );
-              },
-              child: const Text('Continuar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AgriPalette.greenMain,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _guardarCambiosYContinuar,
+              child: const Text(
+                'GUARDAR Y CONTINUAR', 
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+              ),
+            ),
+            
+            const SizedBox(height: 10),
+            
+            // Botón explícito de Cancelar para salir sin alterar la nube
+            TextButton(
+              onPressed: _volverSinGuardar,
+              child: Text(
+                'CANCELAR Y SALIR',
+                style: TextStyle(color: AgriPalette.greyMain.withValues(alpha: 0.8), fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
