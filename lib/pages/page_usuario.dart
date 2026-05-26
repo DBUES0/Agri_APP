@@ -9,6 +9,7 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../pages/page_dashboard.dart'; 
+import 'package:sqflite/sqflite.dart';
 import '../services/api_service.dart'; 
 import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
@@ -136,6 +137,67 @@ class _UsuarioPageState extends State<UsuarioPage> {
   //   }
   // }
 
+// Future<void> _guardarCambiosYContinuar() async {
+//     try {
+// final Map<String, dynamic> datosModificados = {
+//         'pref_agrupacion_str': _prefAlbaranes,
+//         'pref_agrupacion_gastos_str': _prefGastos,
+//       };
+
+//       // 1. BLINDAJE DE ID: Si el usuario no tiene el kagricultor en caché, lo extraemos de su primera finca.
+//       String idAgricultor = widget.usuario.kagricultor;
+//       if (idAgricultor.isEmpty && widget.fincas.isNotEmpty) {
+//         idAgricultor = widget.fincas.first.kagricultor; 
+//       }
+
+//       // 2. CORRECCIÓN DE RUTA: Apuntamos a la tabla en singular (estándar de tu API) con el ID garantizado.
+//       await _apiService.putGeneric('tblagricultor', idAgricultor, datosModificados);
+
+//       // Creamos el clon actualizado para el Dashboard
+//       final usuarioActualizado = Usuario(
+//         kagricultor: widget.usuario.kagricultor, // Conservamos el UUID
+//         nombre: widget.usuario.nombre,
+//         apellidos: widget.usuario.apellidos,
+//         dni: widget.usuario.dni,
+//         direccion: widget.usuario.direccion,
+//         email: widget.usuario.email,
+//         telefono: widget.usuario.telefono,
+//         validado: widget.usuario.validado,
+//         bloqueado: widget.usuario.bloqueado,
+//         intentos: widget.usuario.intentos,
+//         ultimoIntento: widget.usuario.ultimoIntento,
+//         tipoUsuario: widget.usuario.tipoUsuario,
+//         prefAgrupacion: _prefAlbaranes ?? 'finca,cultivo,fecha',
+//         prefAgrupacionGastos: _prefGastos ?? 'almacen,cultivo,fecha',
+//       );
+
+//       if (!mounted) return;
+//       mensajeEmergente(context, 'Preferencias actualizadas');
+
+//       // Volvemos al Dashboard con los datos en orden
+//       Navigator.pushReplacement(
+//         context,
+//         MaterialPageRoute(
+//           builder: (context) => DashboardPage(
+//             usuario: usuarioActualizado, 
+//             fincas: widget.fincas,
+//             tiposGasto: widget.tiposGasto,
+//             almacen: widget.almacen,
+//             producto: widget.producto,
+//             tipodeprecio: widget.tipodeprecio,
+//             tipooperacion: widget.tipooperacion,
+//             trabajador: widget.trabajador,
+//             albaranes: widget.albaranes,
+//           ),
+//         ),
+//       );
+//     } catch (e) {
+//       // Si hay un error de red (como el SocketException de DuckDNS), saltará aquí
+//       print("Error detallado al guardar: $e");
+//       mensajeEmergente(context, 'Error al guardar configuración: $e', tipo: 'error');
+//     }
+//   }
+
 Future<void> _guardarCambiosYContinuar() async {
     try {
       final Map<String, dynamic> datosModificados = {
@@ -143,14 +205,18 @@ Future<void> _guardarCambiosYContinuar() async {
         'pref_agrupacion_gastos_str': _prefGastos,
       };
 
-      // CORRECCIÓN SUTIL PERO VITAL: 
-      // 1. Usamos 'tblAgricultores' respetando la mayúscula de producción.
-      // 2. Cambiamos 'widget.usuario.dni' por 'widget.usuario.kagricultor' (el UUID primario).
-      await _apiService.putGeneric('tblAgricultores', widget.usuario.kagricultor, datosModificados);
+      String idAgricultor = widget.usuario.kagricultor;
+      if (idAgricultor.isEmpty && widget.fincas.isNotEmpty) {
+        idAgricultor = widget.fincas.first.kagricultor; 
+      }
 
-      // Creamos el clon actualizado para el Dashboard
+      // CORRECCIÓN DE ENRUTAMIENTO EN PHP:
+      // Apuntamos al endpoint unificado /api/editar/ o pasamos el esquema exacto que espera tu router.
+      // Si putGeneric internamente ya añade el prefijo "editar/", asegúrate de que el nombre de la tabla sea exacto.
+      await _apiService.putGeneric('tblAgricultores', idAgricultor, datosModificados);
+
       final usuarioActualizado = Usuario(
-        kagricultor: widget.usuario.kagricultor, // Conservamos el UUID
+        kagricultor: idAgricultor,
         nombre: widget.usuario.nombre,
         apellidos: widget.usuario.apellidos,
         dni: widget.usuario.dni,
@@ -169,7 +235,6 @@ Future<void> _guardarCambiosYContinuar() async {
       if (!mounted) return;
       mensajeEmergente(context, 'Preferencias actualizadas');
 
-      // Volvemos al Dashboard con los datos en orden
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -187,11 +252,11 @@ Future<void> _guardarCambiosYContinuar() async {
         ),
       );
     } catch (e) {
-      // Si hay un error de red (como el SocketException de DuckDNS), saltará aquí
       print("Error detallado al guardar: $e");
       mensajeEmergente(context, 'Error al guardar configuración: $e', tipo: 'error');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

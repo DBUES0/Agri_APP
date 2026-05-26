@@ -88,7 +88,18 @@ class _PageAlbaranState extends State<PageAlbaran> {
       _selectedAlmacen = _obtenerUltimoAlmacenUsado();
       
       // Filtramos en caliente los productos del tipo actual para preseleccionar el primero
-      final productosFiltrados = widget.productos.where((p) => p.ktipoalbaran == _currentTipoAlbaran).toList();
+     // AÑADE ESTO PARA DEPURAR
+    print("Tipo de Albarán Actual: $_currentTipoAlbaran");
+    print("Total de productos en memoria: ${widget.productos.length}");
+    for(var p in widget.productos) {
+      print("- ${p.productoStr}: ${p.ktipoalbaran}");
+    }
+
+    final productosFiltrados = widget.productos
+      .where((p) => p.ktipoalbaran == _currentTipoAlbaran)
+      .toList();
+      
+    print("Productos Filtrados: ${productosFiltrados.length}");
       if (productosFiltrados.isNotEmpty) {
         _selectedProducto = productosFiltrados[0].kproducto;
       }
@@ -411,9 +422,18 @@ class _PageAlbaranState extends State<PageAlbaran> {
   void _mostrarDialogoDetalle({AlbaranDetalle? detalle}) {
     
     // Filtramos la lista de productos en caliente basándonos en el tipo de documento activo
+// AÑADE ESTO PARA DEPURAR
+    print("Tipo de Albarán Actual: $_currentTipoAlbaran");
+    print("Total de productos en memoria: ${widget.productos.length}");
+    for(var p in widget.productos) {
+      print("- ${p.productoStr}: ${p.ktipoalbaran}");
+    }
+
     final productosFiltrados = widget.productos
       .where((p) => p.ktipoalbaran == _currentTipoAlbaran)
       .toList();
+      
+    print("Productos Filtrados: ${productosFiltrados.length}");
 
     if (detalle != null) {
       _selectedFinca = detalle.kfinca;

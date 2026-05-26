@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:agriapp/services/sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart'; //
+
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_palette.dart';
@@ -266,7 +268,8 @@ Future<void> _iniciarApp() async {
     } else {
       setState(() => _mensajeStatus = "Cargando perfil desde servidor...");
       final response = await _apiService.fetchParticular('perfil');
-      final Map<String, dynamic> userData = (response is List) ? response.first : response;
+      // final Map<String, dynamic> userData = (response is List) ? response.first : response;
+      final Map<String, dynamic> userData = response.first;
       usuario = Usuario.fromJson(userData);
       await prefs.setString('usuario_json', jsonEncode(userData));
     }
@@ -296,15 +299,25 @@ Future<void> _iniciarApp() async {
     }
 
     // PRODUCTOS
-    setState(() => _mensajeStatus = "Cargando productos...");
-    try {
-      productos = (await _apiService.fetchParticular('productos'))
-          .map((json) => Producto.fromJson(json)).toList();
-      await DBService.instance.saveToCache('productos', productos.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final local = await DBService.instance.getAllFromLocal('productos');
-      productos = local.map((json) => Producto.fromJson(json)).toList();
-    }
+      setState(() => _mensajeStatus = "Cargando productos...");
+      try {
+        // 1. CAMBIO CLAVE: Usamos fetchList apuntando a 'tblproducto' y isComun: true
+        // Esto hace exactamente la misma petición que tu cURL exitoso
+        productos = (await _apiService.fetchList('tblproducto', isComun: true))
+            .map((json) => Producto.fromJson(json)).toList();
+
+        print("Productos cargados desde API: ${productos.length}");
+        print("Productos: ${productos.map((p) => p.kproducto).toList()}");
+            
+        // 2. Guardamos en la caché local con la misma etiqueta
+        await DBService.instance.saveToCache('tblproducto', productos.map((e) => e.toJson()).toList());
+      } catch (e) {
+        // 3. Fallback offline leyendo la misma etiqueta
+        final local = await DBService.instance.getAllFromLocal('tblproducto');
+        productos = local.map((json) => Producto.fromJson(json)).toList();
+      }
+    print("Productos cargados desde API: ${productos.length}");
+    print("Productos: ${productos.map((p) => p.kproducto).toList()}");
 
     // MAESTROS (TIPOS GASTO, PRECIO, OPERACION)
     // Nota: Para ahorrar código, puedes hacerlos individuales o en bloque

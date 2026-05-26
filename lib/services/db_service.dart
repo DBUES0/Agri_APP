@@ -22,8 +22,9 @@ class DBService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade, // Necesitarás este método si no lo tienes
     );
   }
 
@@ -111,5 +112,24 @@ Future<List<Map<String, dynamic>>> getAllFromLocal(String tabla) async {
   return res.map((item) => jsonDecode(item['json_data'] as String) as Map<String, dynamic>).toList();
 }
 
+Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Borramos la tabla vieja
+      await db.execute('DROP TABLE IF EXISTS tblproducto');
+      
+      // Creamos la nueva con el campo ktipoalbaran
+      await db.execute('''
+        CREATE TABLE tblproducto (
+          kproducto TEXT PRIMARY KEY,
+          producto_str TEXT,
+          fecha_dtm TEXT,
+          ktipoalbaran TEXT -- Este es el campo nuevo que necesitamos
+        )
+      ''');
+      
+      // Borramos la caché genérica para forzar la bajada completa
+      await db.execute('DELETE FROM local_cache'); 
+    }
+  }
 
 }

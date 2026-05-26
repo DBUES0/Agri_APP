@@ -1114,6 +1114,11 @@ $app->put('/api/editar/{tabla}/{id}', function (Request $request, Response $resp
     $jwt = $request->getAttribute('jwt');
     $kagricultor = $jwt->sub;
 
+    if($tabla === 'tblAgricultores') {
+        $id = $kagricultor; // Solo se puede editar el propio registro del agricultor
+        $clavePrimaria = 'kagricultor'; // En este caso la clave primaria es kagricultor
+    }
+
     $data = json_decode($request->getBody()->getContents(), true);
     if (!$data || !is_array($data)) {
         return jsonResponse($response, ["error" => "Datos inválidos"], 400);
