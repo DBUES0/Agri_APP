@@ -63,6 +63,18 @@ class AppTheme {
         elevation: 0,
       ),
 
+    expansionTileTheme: const ExpansionTileThemeData(
+            iconColor: AgriPalette.greenMain,
+            textColor: AgriPalette.textoVerdeOscuro,
+            collapsedTextColor: AgriPalette.textoVerdeOscuro,
+            shape: Border(), // <--- ESTO ELIMINA LAS LÍNEAS HORIZONTALES
+            collapsedShape: Border(), // <--- ESTO ELIMINA LA LÍNEA CUANDO ESTÁ CERRADO
+            backgroundColor: Colors.transparent,
+            collapsedBackgroundColor: Colors.transparent,
+            tilePadding: EdgeInsets.symmetric(horizontal: 12),
+            childrenPadding: EdgeInsets.zero,
+          ),
+
 // Dentro de ThemeData get lightTheme
 // Cambia 'DialogTheme' por 'DialogThemeData'
 dialogTheme: DialogThemeData(
@@ -185,4 +197,7 @@ dialogTheme: DialogThemeData(
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
     );
   }
+
+  
+
 }
