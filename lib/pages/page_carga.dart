@@ -357,7 +357,7 @@ Future<void> _iniciarApp() async {
     // ALBARANES
     setState(() => _mensajeStatus = "Recuperando albaranes...");
     try {
-      albaranes = (await _apiService.fetchParticular('albaranes'))
+      albaranes = (await _apiService.fetchParticular('albaranesv2'))
           .map((json) => Albaran.fromJson(json)).toList();
       await DBService.instance.saveToCache('albaranes', albaranes.map((e) => e.toJson()).toList());
     } catch (e) {

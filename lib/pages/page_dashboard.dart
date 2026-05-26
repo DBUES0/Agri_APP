@@ -227,7 +227,7 @@ Future<void> _intentarSincroManual() async {
 
   /// Pide al servidor la lista actualizada de albaranes.
   Future<void> _refreshAlbaranes() async {
-          _albaranes = (await _apiService.fetchParticular('albaranes'))
+          _albaranes = (await _apiService.fetchParticular('albaranesv2'))
           .map((json) => Albaran.fromJson(json)).toList();
      mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
 
@@ -414,8 +414,26 @@ Future<void> _intentarSincroManual() async {
 //   }
 
 @override
-Widget build(BuildContext context) {
-  return Scaffold(
+  Widget build(BuildContext context) {
+    // 1. Aplanamos todo
+    final todosLosMovimientos = _aplanarMovimientos();
+
+    // 2. SEPARAMOS POR TIPO DE DOCUMENTO
+    final ingresos = todosLosMovimientos
+        .where((m) => m.albaranPadre.ktipoalbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df")
+        .toList();
+        
+    final gastos = todosLosMovimientos
+        .where((m) => m.albaranPadre.ktipoalbaran == "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df")
+        .toList();
+
+    // 3. CALCULAMOS TOTALES (Kilos para ingresos, Euros para gastos)
+    final totalKgIngresos = ingresos.fold<double>(0, (sum, item) => sum + item.kg);
+    
+    // El gasto total es la suma de (cantidad * precio) de cada línea
+    final totalEurosGastos = gastos.fold<double>(0, (sum, item) => sum + (item.kg * (item.detalleOriginal.precio ?? 0.0)));
+
+    return Scaffold(
     appBar: AppBar(
       centerTitle: false,
       title: Row(
@@ -463,29 +481,67 @@ Widget build(BuildContext context) {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildAlbaranesSection(), // Tarjeta 1 (Original)
-            _buildAlbaranes2Section(), // Tarjeta 2 (Zona de pruebas dinámica)
+            // _buildAlbaranesSection(), // Tarjeta 1 (Original)
+            // _buildAlbaranes2Section(), // Tarjeta 2 (Zona de pruebas dinámica)
+            // _buildSection(
+            //   'Gastos', 
+            //   onAdd: () async {
+            //     final result = await Navigator.push(
+            //       context,
+            //       MaterialPageRoute(
+            //         builder: (context) => PageAlbaran(
+            //           almacenes: widget.almacen,
+            //           tiposPrecio: widget.tipodeprecio,
+            //           productos: widget.producto,
+            //           fincas: widget.fincas,
+            //           albaranesTotales: _albaranes,
+            //           // CLAVE: Inyectamos el UUID de Gasto de tu BD para que mute el formulario automáticamente
+            //           ktipoalbaran: "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df", 
+            //         ),
+            //       ),
+            //     );
+            //     if (result == true) { _refreshAlbaranes(); }
+            //   }
+            // ),
+            // _buildSection('Gastos', onAdd: () {}),
             _buildSection(
-              'Gastos', 
+              'Albaranes: ${totalKgIngresos.toStringAsFixed(2)} kg',
               onAdd: () async {
                 final result = await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => PageAlbaran(
-                      almacenes: widget.almacen,
-                      tiposPrecio: widget.tipodeprecio,
-                      productos: widget.producto,
-                      fincas: widget.fincas,
-                      albaranesTotales: _albaranes,
-                      // CLAVE: Inyectamos el UUID de Gasto de tu BD para que mute el formulario automáticamente
-                      ktipoalbaran: "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df", 
-                    ),
-                  ),
+                  MaterialPageRoute(builder: (context) => PageAlbaran(
+                    almacenes: widget.almacen, tiposPrecio: widget.tipodeprecio,
+                    productos: widget.producto, fincas: widget.fincas, albaranesTotales: _albaranes,
+                    ktipoalbaran: "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df", // INGRESO
+                  )),
                 );
                 if (result == true) { _refreshAlbaranes(); }
-              }
+              },
+              child: ingresos.isEmpty 
+                  ? const Padding(padding: EdgeInsets.all(16), child: Text('No hay ingresos registrados'))
+                  // Inyectamos el árbol dinámico de ingresos
+                  : _construirNivelDinamicamente(ingresos, widget.usuario.prefAgrupacion.split(','), 0),
             ),
-            _buildSection('Gastos', onAdd: () {}),
+
+            // --- SECCIÓN: GASTOS (EGRESOS) ---
+            _buildSection(
+              'Gastos: ${totalEurosGastos.toStringAsFixed(2)} €',
+              onAdd: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PageAlbaran(
+                    almacenes: widget.almacen, tiposPrecio: widget.tipodeprecio,
+                    productos: widget.producto, fincas: widget.fincas, albaranesTotales: _albaranes,
+                    ktipoalbaran: "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df", // GASTO
+                  )),
+                );
+                if (result == true) { _refreshAlbaranes(); }
+              },
+              child: gastos.isEmpty 
+                  ? const Padding(padding: EdgeInsets.all(16), child: Text('No hay gastos registrados'))
+                  // Inyectamos el árbol dinámico de GASTOS (usando su propia preferencia)
+                  : _construirNivelDinamicamente(gastos, widget.usuario.prefAgrupacionGastos.split(','), 0),
+            ),
             _buildSection('Operaciones', onAdd: () {}),
             _buildSection('Jornadas', onAdd: () {}, extra: const Text("Último día: 2025/05/19")),
             _buildSection('Notas', onAdd: () {}),
@@ -675,7 +731,7 @@ Widget build(BuildContext context) {
   }
 
   /// [buildSection] Crea una tarjeta estándar para Gastos, Operaciones, etc.
-  Widget _buildSection(String title, {required VoidCallback onAdd, Widget? extra}) {
+Widget _buildSection(String title, {required VoidCallback onAdd, Widget? extra, Widget? child}) {
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 10),
@@ -687,11 +743,12 @@ Widget build(BuildContext context) {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style:  Theme.of(context).textTheme.titleLarge),//const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.add),  color: AgriPalette.greenMain, onPressed: onAdd),
+                Text(title, style: Theme.of(context).textTheme.titleLarge),
+                IconButton(icon: const Icon(Icons.add), color: AgriPalette.greenMain, onPressed: onAdd),
               ],
             ),
-            if (extra != null) extra, // Si pasamos un widget extra (como la fecha de jornadas), se muestra aquí.
+            if (extra != null) extra, // Si pasamos un widget extra (como la fecha de jornadas).
+            if (child != null) child, // AQUÍ SE DIBUJARÁ EL ÁRBOL DINÁMICO.
           ],
         ),
       ),
@@ -1064,7 +1121,11 @@ Widget _buildAlbaranes2Section() {
             dense: true,
             leading: const Icon(Icons.arrow_right, color: AgriPalette.greyMain),
             title: Text(
-              'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ${m.kg.toStringAsFixed(1)} kg',
+              // Mostramos el precio total de la línea si existe
+              'Línea ${m.detalleOriginal.linea}: ${m.nombreProducto} -> ' +
+              (m.albaranPadre.ktipoalbaran == "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df" 
+                ? '${(m.kg * (m.detalleOriginal.precio ?? 0.0)).toStringAsFixed(2)} €'
+                : '${m.kg.toStringAsFixed(1)} kg'),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             subtitle: Text(
@@ -1130,25 +1191,50 @@ Widget _buildAlbaranes2Section() {
     return Column(
       children: agrupados.entries.map((entry) {
         final subLista = entry.value;
+        
+        // 1. DETECTAMOS SI EL NODO ES DE GASTOS O INGRESOS
+        final bool esGasto = subLista.isNotEmpty && subLista.first.albaranPadre.ktipoalbaran == "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df";
+        
+        // 2. CALCULAMOS AMBOS TOTALES
         final subTotalKg = subLista.fold<double>(0, (sum, m) => sum + m.kg);
+        final subTotalEuros = subLista.fold<double>(0, (sum, m) => sum + (m.kg * (m.detalleOriginal.precio ?? 0.0)));
         
-        String tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg';
-        
-        // --- CORRECCIÓN QUIRÚRGICA DEL RENDIMIENTO M² ---
-        // Si el criterio que estamos pintando en este nivel es 'finca', calculamos el rendimiento real de TODO el nodo
-        if (criterioActual == 'finca') {
-          final fincaObj = widget.fincas.firstWhere(
-            (f) => f.kfinca == entry.key,
-            orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: '', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
-          );
+        String tituloFinal = '';
+
+        // 3. LÓGICA CONDICIONAL DE PRESENTACIÓN
+        if (esGasto) {
+          // Presentación para Gastos: Solo Dinero (€)
+          tituloFinal = '${etiquetasLegibles[entry.key]}: ${subTotalEuros.toStringAsFixed(2)} €';
           
-          // Conseguimos los metros de la finca actualizando las salvaguardas
-          final double areaFinca = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+          // Cálculo de coste por metro cuadrado (solo si la agrupación actual es por Finca)
+          if (criterioActual == 'finca') {
+            final fincaObj = widget.fincas.firstWhere(
+              (f) => f.kfinca == entry.key,
+              orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: '', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
+            );
+            
+            final double areaFinca = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+            final double costePorM2 = subTotalEuros / areaFinca;
+            
+            // Usamos 3 decimales (0.000 €/m²) porque los costes por metro pueden ser céntimos
+            tituloFinal = '${etiquetasLegibles[entry.key]}: ${subTotalEuros.toStringAsFixed(2)} € (${costePorM2.toStringAsFixed(3)} €/m²)';
+          }
+        } else {
+          // Presentación para Ingresos: Kilos puros
+          tituloFinal = '${etiquetasLegibles[entry.key]}: ${subTotalKg.toStringAsFixed(0)} kg';
           
-          // CÁLCULO REAL: La suma de todos los kilos acumulados en este nodo / el área real de la finca
-          final double rendimientoReal = subTotalKg / areaFinca;
-          
-          tituloFinal = '${etiquetasLegibles[entry.key]} ${subTotalKg.toStringAsFixed(0)} kg (${rendimientoReal.toStringAsFixed(1)} kg/m²)';
+          // Cálculo de rendimiento (solo si es Finca y es Ingreso)
+          if (criterioActual == 'finca') {
+            final fincaObj = widget.fincas.firstWhere(
+              (f) => f.kfinca == entry.key,
+              orElse: () => finca(kfinca: '', kfincapadre: '', nombreStr: '', descripcionStr: '', kagricultor: '', ubicacionStr: '', aream2Flt: 1, campo1Str: '', campo2Str: '', fecha: DateTime.now(), fechaultimouso: DateTime.now()),
+            );
+            
+            final double areaFinca = fincaObj.aream2Flt > 0 ? fincaObj.aream2Flt : 1;
+            final double rendimientoReal = subTotalKg / areaFinca;
+            
+            tituloFinal = '${etiquetasLegibles[entry.key]}: ${subTotalKg.toStringAsFixed(0)} kg (${rendimientoReal.toStringAsFixed(1)} kg/m²)';
+          }
         }
 
         final String llaveUnica = "nivel_${indexCriterio}_${entry.key}_$criterioActual";
