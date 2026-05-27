@@ -87,11 +87,17 @@ void initState() {
   super.initState();
   _albaranes = widget.albaranes;
 
-  // --- ESCUCHAMOS AL TRABAJADOR DE FONDO ---
+  // 1. FORZAR ACTUALIZACIÓN FRESCA AL ENTRAR
+  // Esto asegura que, aunque DashboardCarga traiga datos viejos, 
+  // en cuanto el Dashboard abre, se traen los reales.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _superRefresh();
+  });
+
+  // 2. ESCUCHA DE SINCRONIZACIÓN
   SyncService.syncStream.listen((finalizadoOk) {
     if (finalizadoOk && mounted) {
-      print("SyncService avisa: ¡Cola vacía o registros subidos! Refrescando UI...");
-      _refreshAlbaranes(); // Esto actualiza la lista visual con lo que ya está en el servidor
+      _refreshAlbaranes();
     }
   });
 }
@@ -421,7 +427,7 @@ Widget build(BuildContext context) {
   // 2. FILTROS EXPLICITOS
   // IMPORTANTE: Asegúrate de que estos UUIDs sean los correctos. 
   // Si los tomates (Ingresos) se van a gastos, es porque este UUID es el de Gastos.
-  final String uuidIngreso = "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df"; // CAMBIA ESTO SI HACE FALTA
+  final String uuidIngreso =  "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df"; // CAMBIA ESTO SI HACE FALTA
   final String uuidGasto = "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df";   // CAMBIA ESTO SI HACE FALTA
 
   final ingresos = todosLosMovimientos.where((m) => m.albaranPadre.ktipoalbaran == uuidIngreso).toList();
@@ -1397,6 +1403,7 @@ Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<Strin
     }
 
     String criterioActual = criterios[indexCriterio].trim().toLowerCase();
+    //print("DEBUG: Nivel $indexCriterio | Criterio recibido: '$criterioActual'"); // <--- ESTO ES VITAL
     Map<String, List<MovimientoVisual>> agrupados = {};
     Map<String, String> etiquetasLegibles = {};
 
@@ -1407,8 +1414,15 @@ Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<Strin
         case 'finca': key = m.idFinca; etiqueta = m.nombreFinca; break;
         case 'cultivo': key = m.idProducto; etiqueta = m.nombreProducto; break;
         case 'almacen': key = m.idAlmacen; etiqueta = m.nombreAlmacen; break;
+        case 'mes':
+          // Clave sortable: 2026-05
+          key = "${m.fecha.year}-${m.fecha.month.toString().padLeft(2, '0')}";
+          // Etiqueta legible: Mayo 2026
+          etiqueta = "${m.fecha.year}-${m.fecha.month.toString().padLeft(2, '0')}"; //'${_nombreMes(m.fecha.month)} ${m.fecha.year}';
+          break;
         case 'fecha':
-          key = "${m.fecha.year}-${m.fecha.month}-${m.fecha.day}";
+          // Añadimos padLeft(2, '0') para que sea siempre YYYY-MM-DD
+          key = "${m.fecha.year}-${m.fecha.month.toString().padLeft(2, '0')}-${m.fecha.day.toString().padLeft(2, '0')}";
           etiqueta = '${m.fecha.day.toString().padLeft(2,'0')}/${m.fecha.month.toString().padLeft(2,'0')}/${m.fecha.year}';
           break;
         default: key = "desconocido"; etiqueta = "Otros";
@@ -1418,8 +1432,25 @@ Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<Strin
       etiquetasLegibles[key] = etiqueta;
     }
 
+    // return Column(
+    //   children: agrupados.entries.map((entry) {
+    //     final subLista = entry.value;
+// 1. Convertimos las entradas del mapa a una lista para poder ordenarla
+    var listaEntradas = agrupados.entries.toList();
+
+    // 2. Lógica de ordenación
+    if (criterioActual == 'fecha' || criterioActual == 'mes') {
+      // Si es fecha, ordenamos de forma descendente (Más recientes primero)
+      // Como el formato de clave es YYYY-MM-DD, un compareTo simple funciona perfecto
+      listaEntradas.sort((a, b) => b.key.compareTo(a.key));
+    } else {
+      // Si no es fecha, ordenamos alfabéticamente por la etiqueta
+      listaEntradas.sort((a, b) => etiquetasLegibles[a.key]!.compareTo(etiquetasLegibles[b.key]!));
+    }
+
+    // 3. Ahora usamos listaEntradas en lugar de agrupados.entries
     return Column(
-      children: agrupados.entries.map((entry) {
+      children: listaEntradas.map((entry) {
         final subLista = entry.value;
         final bool esGasto = subLista.every((m) => m.albaranPadre.ktipoalbaran == "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df");
         

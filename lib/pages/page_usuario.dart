@@ -9,7 +9,6 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../pages/page_dashboard.dart'; 
-import 'package:sqflite/sqflite.dart';
 import '../services/api_service.dart'; 
 import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
@@ -52,6 +51,19 @@ class _UsuarioPageState extends State<UsuarioPage> {
     "almacen,finca,fecha": "Almacén > Finca > Fecha",
     "fecha,cultivo,finca": "Fecha > Cultivo > Finca",
     "Fecha,finca,cultivo": "Fecha > Finca > Cultivo",
+    "mes,cultivo,finca": "Mes > Cultivo > Finca",
+    "mes,finca,cultivo": "Mes > Finca > Cultivo",
+    "almacen,mes,cultivo,fecha": "Almacén > Mes > Cultivo > Fecha",
+    "mes,almacen,cultivo,fecha": "Mes > Almacén > Cultivo > Fecha",
+    "mes,almacen,finca,fecha": "Mes > Almacén > Finca > Fecha",
+    "mes,finca,almacen,fecha": "Mes > Finca > Almacén > Fecha",
+    "finca,mes,cultivo,fecha": "Finca > Mes > Cultivo > Fecha",
+    "mes,finca,cultivo,fecha": "Mes > Finca > Cultivo > Fecha",
+    "finca,mes,almacen,fecha": "Finca > Mes > Almacén > Fecha",
+    "mes,almacen": "Mes > Almacén",
+    "mes,finca": "Mes > Finca",
+    "mes,cultivo": "Mes > Cultivo",
+    "mes,fecha": "Mes > Fecha",
   };
 
   String? _prefAlbaranes;

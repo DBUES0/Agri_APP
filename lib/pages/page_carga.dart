@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:agriapp/services/sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart'; //
+//
 
 import '../services/api_service.dart';
 import '../utils/app_theme.dart';
@@ -389,13 +389,22 @@ Future<void> _iniciarApp() async {
     );
 
 
+// En lib/pages/page_carga.dart, dentro de tu bloque try-catch:
   } catch (e) {
     print("Error crítico en carga: $e");
-    // Solo si el usuario es null (primera vez total) vamos al login
-    _irAlLogin();
+    
+    // Si el error es de autenticación, borramos todo y al login
+    if (e.toString().contains("401") || e.toString().contains("Expired")) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('token');
+      await prefs.remove('usuario_json');
+      _irAlLogin(); 
+    } else {
+      // Si es otro tipo de error (red), intentamos cargar de local pero con aviso
+      _irAlLogin(); // Recomendación: Si no hay red, mejor ir a Login o mostrar error
+    }
   }
 }
-
   void _irAlLogin() {
     if (!mounted) return;
     Navigator.pushReplacement(
