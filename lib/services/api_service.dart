@@ -9,7 +9,7 @@ import 'db_service.dart';                                     // Para que recono
 import 'package:flutter/material.dart'; // <--- ARREGLA CONTEXT, NAVIGATOR Y MATERIALPAGEROUTE
 import '../pages/page_login.dart';    // <--- ARREGLA EL ERROR DE LOGINPAGE
 import 'dart:async';
-
+import '../models/record_trabajador.dart';
 
 
 class ApiService {
@@ -143,16 +143,8 @@ static const String baseUrl = 'https://api.bueso.online/api';
         return [];
       }
     }
-  // 3. Endpoints especiales (como los albaranes que tienen lógica compleja)
-  // Future<List<dynamic>> fetchParticular(String endpoint) async {
-  //   final url = Uri.parse('$baseUrl/$endpoint');
-  //   final response = await http.get(url, headers: await _getHeaders());
-  //   if (response.statusCode == 200) {
-  //     return jsonDecode(response.body);
-  //   } else {
-  //     throw 'Error al obtener datos de $endpoint';
-  //   }
-  // }
+
+
 Future<List<dynamic>> fetchParticular(String endpoint) async {
   final url = Uri.parse('$baseUrl/$endpoint');
   
@@ -265,51 +257,6 @@ Future<Map<String, dynamic>> uploadFile({
     throw Exception('Error al subir archivo: ${response.body}');
   }
 }
-
-// Opción rápida: Abrir en el navegador del móvil
-// Future<void> descargarYVerArchivo(String karchivo) async {
-//   final prefs = await SharedPreferences.getInstance();
-//   final token = prefs.getString('token');
-  
-//   // Construimos la URL completa incluyendo el token como parámetro query 
-//   // para que el navegador tenga permiso de descarga
-//   final String urlString = '$baseUrl/gastos/descargararchivo/$karchivo?token=$token';
-//   final Uri url = Uri.parse(urlString);
-
-//   try {
-//     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-//       throw Exception('No se pudo abrir el archivo en $urlString');
-//     }
-//   } catch (e) {
-//     print("Error al abrir URL: $e");
-//   }
-// }
-// Future<void> descargarYVerArchivo(String karchivo) async {
-//   final prefs = await SharedPreferences.getInstance();
-//   final token = prefs.getString('token');
-  
-//   // Construimos la URL. Usamos la variable de clase baseUrl si existe.
-//   final String urlString = '$baseUrl/gastos/descargararchivo/$karchivo?token=$token';
-//   final Stringresponse = await http.delete(url, headers: await _getHeaders());
-//   final Uri url = Uri.parse(urlString);
-
-//   try {
-//     // launchUrl es la función que efectivamente abre el navegador o el visor de archivos
-//     if (await canLaunchUrl(url)) {
-//       await launchUrl(
-//         url, 
-//         mode: LaunchMode.externalApplication, // Abre el navegador del sistema
-//       );
-//     } else {
-//       throw 'No se pudo abrir la URL: $urlString';
-//     }
-//   } catch (e) {
-//     debugPrint("Error al descargar archivo: $e");
-//     // Aquí no puedes llamar a mensajeEmergente directamente por lo explicado arriba,
-//     // es mejor lanzar el error y que la página lo capture y lo muestre.
-//     rethrow; 
-//   }
-// }
 
 Future<void> descargarYVerArchivo(String karchivo) async {
   try {
@@ -497,23 +444,7 @@ Future<void> sincronizarPendientes() async {
   }
 }
 
-// // En ApiService.dart o donde gestiones la navegación global
-// Future<void> cerrarSesion(BuildContext context) async {
-//   final prefs = await SharedPreferences.getInstance();
-//   await prefs.remove('token');
-//   await prefs.remove('usuario_json');
-  
-//   // Limpiamos la pila de navegación y mandamos al Login
-//   if (context.mounted) {
-//     Navigator.pushAndRemoveUntil(
-//       context,
-//       MaterialPageRoute(builder: (context) => const LoginPage()),
-//       (route) => false,
-//     );
-//   }
-// }
 
-// En lib/services/api_service.dart
 
 Future<void> cerrarSesion(BuildContext context) async {
   final prefs = await SharedPreferences.getInstance();
@@ -536,81 +467,6 @@ Future<void> cerrarSesion(BuildContext context) async {
 }
 
 
-
-// Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo) async {
-//   try {
-//     final url = Uri.parse('$baseUrl/subirArchivo'); // Ajusta a tu ruta real
-    
-//     // Creamos la petición Multipart
-//     var request = http.MultipartRequest('POST', url);
-    
-//     // 1. Añadimos los headers (Token de seguridad)
-//     request.headers.addAll(await _getHeaders());
-
-//     // 2. Añadimos los campos de texto que tu PHP espera
-//     request.fields['kuuid'] = kuuidPadre;
-//     request.fields['tipo'] = tipo;
-
-//     // 3. Añadimos el archivo físico
-//     request.files.add(await http.MultipartFile.fromPath(
-//       'archivo', // Coincide con $uploadedFiles['archivo'] en tu PHP
-//       pathLocal,
-//       filename: basename(pathLocal),
-//     ));
-
-//     // Enviamos
-//     var streamedResponse = await request.send();
-//     var response = await http.Response.fromStream(streamedResponse);
-
-//     if (response.statusCode == 200) {
-//       final resBody = jsonDecode(response.body);
-//       print("Archivo subido con éxito: ${resBody['uuid']}");
-//       return resBody['uuid']; // Devolvemos el karchivos (ID) que generó el servidor
-//     } else {
-//       print("Error subiendo archivo: ${response.body}");
-//       return null;
-//     }
-//   } catch (e) {
-//     print("Excepción en subida de archivo: $e");
-//     return null;
-//   }
-// En lib/services/api_service.dart
-
-// Future<String?> subirArchivoMultipart(String pathLocal, String kuuidPadre, String tipo, {String? karchivoLocal}) async {
-//   try {
-//     final url = Uri.parse('$baseUrl/subirArchivo');
-//     var request = http.MultipartRequest('POST', url);
-    
-//     request.headers.addAll(await _getHeaders());
-
-//     // Enviamos los campos que PHP espera
-//     request.fields['kuuid'] = kuuidPadre; // ID del Albarán[cite: 1, 2]
-//     request.fields['tipo'] = tipo;        // 'ALBARAN'[cite: 1, 2]
-    
-//     // --- NUEVO: Enviamos el ID del archivo para que la API lo respete ---
-//     if (karchivoLocal != null) {
-//       request.fields['karchivos'] = karchivoLocal;
-//     }
-
-//     request.files.add(await http.MultipartFile.fromPath(
-//       'archivo',
-//       pathLocal,
-//       filename: basename(pathLocal),
-//     ));
-
-//     var response = await http.Response.fromStream(await request.send());
-
-//     if (response.statusCode == 200) {
-//       final resBody = jsonDecode(response.body);
-//       // Usamos .toString() para asegurar que nunca sea un int
-//       return resBody['uuid']?.toString(); 
-//     }
-//     return null;
-//   } catch (e) {
-//     print("Error: $e");
-//     return null;
-//   }
-// }
 Future<String?> subirArchivoMultipart(
   String pathLocal, 
   String kuuidPadre, 
@@ -679,5 +535,35 @@ Future<String?> subirArchivoMultipart(
     return null; // No rompemos la App, simplemente cancelamos este archivo por ahora
   }
 }
+
+Future<List<Trabajador>> fetchTrabajadoresActivos() async {
+  try {
+    // CAMBIO: fetchParticular en lugar de getParticular
+    final response = await fetchParticular('trabajadores/activos');
+    
+    // Asegúrate de que response sea una lista antes de mapear
+    if (response is List) {
+      return response.map((json) => Trabajador.fromJson(json)).toList();
+    }
+    return [];
+  } catch (e) {
+    print("Error cargando trabajadores activos: $e");
+    return [];
+  }
+}
+
+Future<void> postGeneric(String tabla, Map<String, dynamic> data) async {
+  final url = Uri.parse('$baseUrl/insertar/$tabla');
+  final response = await http.post(
+    url, 
+    headers: await _getHeaders(), 
+    body: jsonEncode(data)
+  );
+  
+  if (response.statusCode != 200 && response.statusCode != 201) {
+    throw 'Error al insertar en $tabla: ${response.body}';
+  }
+}
+
 }
 

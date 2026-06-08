@@ -22,6 +22,7 @@ import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../models/record_movimientovisual.dart';
 import '../pages/page_albaran.dart';
+import '../pages/page_trabajador.dart';
 
 
 /// [DashboardPage] es la pantalla principal tras el login.
@@ -512,7 +513,36 @@ Widget build(BuildContext context) {
               child: gastos.isEmpty ? const Padding(padding: EdgeInsets.all(16), child: Text('No hay gastos')) 
                   : _construirNivelDinamicamente(gastos, widget.usuario.prefAgrupacionGastos.split(','), 0),
             ),            _buildSection('Operaciones', onAdd: () {}),
-            _buildSection('Jornadas', onAdd: () {}, child: const Text("Último día: 2025/05/19")),
+            //_buildSection2('Jornadas', onAdd: () {}, child: const Text("Último día: 2025/05/19")),
+            
+            _buildSection2(
+              'Jornadas',
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined),
+                  color: AgriPalette.greyMain,
+                  tooltip: 'Informes',
+                  onPressed: () { /* Navegar a Informes */ },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.people_outline),
+                  color: AgriPalette.greenMain,
+                  tooltip: 'Gestión Personal',
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PageTrabajadores())),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  color: AgriPalette.greenMain,
+                  tooltip: 'Añadir Jornada',
+                  onPressed: () { /* Navegar a PageJornada */ },
+                ),
+              ],
+              child: const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text("Historial de jornadas próximamente..."),
+              ),
+            ),
+
             _buildSection('Notas', onAdd: () {}),
           ],
         );
@@ -711,6 +741,23 @@ Widget _buildSection(String title, {required VoidCallback onAdd, Widget? child})
         color: AgriPalette.greenMain, 
         onPressed: onAdd
       ),
+      children: [
+        if (child != null) child,
+      ],
+    ),
+  );
+}
+
+Widget _buildSection2(String title, {List<Widget>? actions, Widget? child}) {
+  return Card(
+    elevation: 2,
+    margin: const EdgeInsets.symmetric(vertical: 10),
+    child: ExpansionTile(
+      title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      // Si enviamos acciones, las mostramos; si no, dejamos espacio libre o vacío
+      trailing: actions != null 
+          ? Row(mainAxisSize: MainAxisSize.min, children: actions) 
+          : null,
       children: [
         if (child != null) child,
       ],
