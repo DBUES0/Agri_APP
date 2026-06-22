@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
 import 'package:intl/intl.dart'; // Importa intl para formatear fechas si lo tienes, o usa toIso8601String()
+import 'package:uuid/uuid.dart';
 
 class PageTrabajadorForm extends StatefulWidget {
   const PageTrabajadorForm({Key? key}) : super(key: key);
@@ -50,16 +51,20 @@ class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // GENERAR UUID LOCALMENTE
+    final String nuevoId = const Uuid().v4();
+
     try {
-      final nuevoTrabajador = {
-        'nombre_str': _nombreController.text,
-        'dni_str': _dniController.text,
-        'telefono_str': _telefonoController.text,
-        'email_str': _emailController.text,
-        'fechainicioultimocontrato_dtm': _fechaInicio?.toIso8601String(),
-        'fechafinultimocontrato_dtm': _fechaFin?.toIso8601String(),
-        'eliminado_bit': 0,
-      };
+        final nuevoTrabajador = {
+          'ktrabajador': nuevoId, // Enviamos el ID ya generado
+          'nombre_str': _nombreController.text,
+          'dni_str': _dniController.text,
+          'telefono_str': _telefonoController.text,
+          'email_str': _emailController.text,
+          'fechainicioultimocontrato_dtm': _fechaInicio?.toIso8601String(),
+          'fechafinultimocontrato_dtm': _fechaFin?.toIso8601String(),
+          'eliminado_bit': 0, // ENVIAR SIEMPRE COMO INT (0)
+        };
 
       await _apiService.postGeneric('tbltrabajador', nuevoTrabajador);
       

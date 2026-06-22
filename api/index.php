@@ -1208,73 +1208,144 @@ $app->delete('/api/eliminar/{tabla}/{id}', function (Request $request, Response 
 });
 
 //creación de un generico de cualquier tabla siempre que el ID primario de la tabla sea el mismo que el nombre de la tabla pero sustituyendo tbl -> k
+// $app->post('/api/crear/{tabla}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
+//     $tabla = $args['tabla'];
+//     $data = json_decode($request->getBody()->getContents(), true);
+//     $jwt = $request->getAttribute('jwt');
+//     $kagricultor = $jwt->sub;
+
+//     // Prohibir insertar directamente en tblAgricultores
+//     if (strtolower($tabla) === 'tblagricultores') {
+//         return jsonResponse($response, ["error" => "No está permitido insertar registros en esta tabla."], 403);
+//     }
+
+//     try {
+//         $conn = conectarDB($servername, $username, $password, $dbname);
+
+//         // Obtener columnas válidas de la tabla
+//         $columnsResult = $conn->query("SHOW COLUMNS FROM `$tabla`");
+//         if (!$columnsResult) {
+//             throw new Exception("Tabla '$tabla' no encontrada o error al acceder.");
+//         }
+
+//         $allowedColumns = [];
+//         while ($col = $columnsResult->fetch_assoc()) {
+//             $allowedColumns[] = $col['Field'];
+//         }
+
+//         // Insertar automáticamente el kagricultor
+//         $data['kagricultor'] = $kagricultor;
+
+//         // Filtrar solo columnas existentes
+//         $insertData = array_intersect_key($data, array_flip($allowedColumns));
+//         if (empty($insertData)) {
+//             throw new Exception("No se proporcionaron columnas válidas para insertar.");
+//         }
+
+//         $columns = implode(", ", array_keys($insertData));
+//         $placeholders = implode(", ", array_fill(0, count($insertData), "?"));
+//         $values = array_values($insertData);
+
+//         // Preparar tipos para bind_param
+//         $types = str_repeat("s", count($values)); // por simplicidad asumimos todo como string
+
+//         $stmt = $conn->prepare("INSERT INTO `$tabla` ($columns) VALUES ($placeholders)");
+//         $stmt->bind_param($types, ...$values);
+//         $stmt->execute();
+
+//         $insertedId = $conn->insert_id;
+//         $stmt->close();
+
+//                 // Obtener nombre de la columna UUID primaria: k + nombre sin "tbl"
+//                 $primaryKey = 'k' . strtolower(preg_replace('/^tbl/', '', $tabla));
+
+//                 // Buscar el último UUID insertado para este agricultor
+//                 $uuidStmt = $conn->prepare("SELECT `$primaryKey` FROM `$tabla` WHERE kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
+//                 $uuidStmt->bind_param("s", $kagricultor);
+//                 $uuidStmt->execute();
+//                 $uuidStmt->bind_result($uuid);
+//                 $uuidStmt->fetch();
+//                 $uuidStmt->close();
+
+
+//         $conn->close();
+
+//                 return jsonResponse($response, [
+//                         "mensaje" => "Registro insertado correctamente",
+//                         "tabla" => $tabla,
+//                         "uuid" => $uuid
+//                 ]);
+//     } catch (Exception $e) {
+//         return jsonResponse($response, ["error" => $e->getMessage()], 500);
+//     }
+// });
+
 $app->post('/api/crear/{tabla}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
     $tabla = $args['tabla'];
     $data = json_decode($request->getBody()->getContents(), true);
     $jwt = $request->getAttribute('jwt');
     $kagricultor = $jwt->sub;
 
-    // Prohibir insertar directamente en tblAgricultores
     if (strtolower($tabla) === 'tblagricultores') {
-        return jsonResponse($response, ["error" => "No está permitido insertar registros en esta tabla."], 403);
+        return jsonResponse($response, ["error" => "No permitido"], 403);
     }
 
     try {
         $conn = conectarDB($servername, $username, $password, $dbname);
 
-        // Obtener columnas válidas de la tabla
+        // 1. Validar columnas
         $columnsResult = $conn->query("SHOW COLUMNS FROM `$tabla`");
-        if (!$columnsResult) {
-            throw new Exception("Tabla '$tabla' no encontrada o error al acceder.");
-        }
-
         $allowedColumns = [];
         while ($col = $columnsResult->fetch_assoc()) {
             $allowedColumns[] = $col['Field'];
         }
 
-        // Insertar automáticamente el kagricultor
+        // 2. Preparar datos
         $data['kagricultor'] = $kagricultor;
-
-        // Filtrar solo columnas existentes
-        $insertData = array_intersect_key($data, array_flip($allowedColumns));
-        if (empty($insertData)) {
-            throw new Exception("No se proporcionaron columnas válidas para insertar.");
+        
+        // Forzamos que eliminado_bit sea 0 o 1 (int)
+        if (isset($data['eliminado_bit'])) {
+            $data['eliminado_bit'] = $data['eliminado_bit'] ? 1 : 0;
         }
 
-        $columns = implode(", ", array_keys($insertData));
+        $insertData = array_intersect_key($data, array_flip($allowedColumns));
+        
+        // --- AQUÍ ESTÁ EL CAMBIO ---
+        // Construimos los tipos (types) y valores (values) dinámicamente
+        $columns = array_keys($insertData);
         $placeholders = implode(", ", array_fill(0, count($insertData), "?"));
-        $values = array_values($insertData);
+        $values = [];
+        $types = "";
 
-        // Preparar tipos para bind_param
-        $types = str_repeat("s", count($values)); // por simplicidad asumimos todo como string
-
-        $stmt = $conn->prepare("INSERT INTO `$tabla` ($columns) VALUES ($placeholders)");
+        foreach ($insertData as $key => $val) {
+            $values[] = $val;
+            // Si la columna es 'eliminado_bit', forzamos tipo 'i' (integer). Si no, usamos 's' (string).
+            $types .= ($key === 'eliminado_bit') ? 'i' : 's';
+        }
+        // ---------------------------
+        if (isset($data['eliminado_bit'])) {
+            // Si es booleano (true/false) o entero (0/1), lo convertimos siempre a entero 0 o 1
+            $data['eliminado_bit'] = ($data['eliminado_bit'] === true || $data['eliminado_bit'] === 1) ? 1 : 0;
+        }
+        // 3. Insertar
+        // Usamos comillas invertidas para los nombres de columna por seguridad
+        $columnList = "`" . implode("`, `", $columns) . "`";
+        
+        $stmt = $conn->prepare("INSERT INTO `$tabla` ($columnList) VALUES ($placeholders)");
+        
+        // Pasamos los tipos y los valores desglosados
         $stmt->bind_param($types, ...$values);
         $stmt->execute();
-
-        $insertedId = $conn->insert_id;
         $stmt->close();
-
-                // Obtener nombre de la columna UUID primaria: k + nombre sin "tbl"
-                $primaryKey = 'k' . strtolower(preg_replace('/^tbl/', '', $tabla));
-
-                // Buscar el último UUID insertado para este agricultor
-                $uuidStmt = $conn->prepare("SELECT `$primaryKey` FROM `$tabla` WHERE kagricultor = ? ORDER BY fecha_dtm DESC LIMIT 1");
-                $uuidStmt->bind_param("s", $kagricultor);
-                $uuidStmt->execute();
-                $uuidStmt->bind_result($uuid);
-                $uuidStmt->fetch();
-                $uuidStmt->close();
-
-
         $conn->close();
 
-                return jsonResponse($response, [
-                        "mensaje" => "Registro insertado correctamente",
-                        "tabla" => $tabla,
-                        "uuid" => $uuid
-                ]);
+        // 4. Devolvemos el ID que el cliente nos envió
+        $idKey = 'k' . strtolower(preg_replace('/^tbl/', '', $tabla));
+        return jsonResponse($response, [
+            "mensaje" => "Insertado correctamente",
+            "uuid" => $data[$idKey] ?? "desconocido" 
+        ]);
+
     } catch (Exception $e) {
         return jsonResponse($response, ["error" => $e->getMessage()], 500);
     }

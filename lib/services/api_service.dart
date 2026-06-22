@@ -542,24 +542,44 @@ Future<List<Trabajador>> fetchTrabajadoresActivos() async {
     final response = await fetchParticular('trabajadores/activos');
     
     // Asegúrate de que response sea una lista antes de mapear
-    if (response is List) {
-      return response.map((json) => Trabajador.fromJson(json)).toList();
-    }
-    return [];
+    return response.map((json) => Trabajador.fromJson(json)).toList();
+      return [];
   } catch (e) {
     print("Error cargando trabajadores activos: $e");
     return [];
   }
 }
 
+// Future<void> postGeneric(String tabla, Map<String, dynamic> data) async {
+//   final url = Uri.parse('$baseUrl/insertar/$tabla');
+//   final response = await http.post(
+//     url, 
+//     headers: await _getHeaders(), 
+//     body: jsonEncode(data)
+//   );
+  
+//   if (response.statusCode != 200 && response.statusCode != 201) {
+//     throw 'Error al insertar en $tabla: ${response.body}';
+//   }
+// }
+
 Future<void> postGeneric(String tabla, Map<String, dynamic> data) async {
-  final url = Uri.parse('$baseUrl/insertar/$tabla');
+  final url = Uri.parse('$baseUrl/crear/$tabla');
+  
+  // OBTENEMOS HEADERS Y LOS IMPRIMIMOS
+  final headers = await _getHeaders();
+  print("DEBUG POST: URL -> $url");
+  print("DEBUG POST: Headers -> $headers"); // <--- MIRA ESTO EN LA CONSOLA
+  print("DEBUG POST: Body -> ${jsonEncode(data)}");
+
   final response = await http.post(
     url, 
-    headers: await _getHeaders(), 
+    headers: headers, 
     body: jsonEncode(data)
   );
   
+  print("DEBUG POST: Respuesta (${response.statusCode}) -> ${response.body}");
+
   if (response.statusCode != 200 && response.statusCode != 201) {
     throw 'Error al insertar en $tabla: ${response.body}';
   }
