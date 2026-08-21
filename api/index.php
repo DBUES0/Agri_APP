@@ -113,18 +113,34 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
         if ($ultimoIntentoDT && $now->getTimestamp() - $ultimoIntentoDT->getTimestamp() < 5) {
             return jsonResponse($response, ['error' => 'Espere al menos 5 segundos antes de intentar nuevamente.'], 429);
         }
+        
+        //2026.08.21 comentado para probar hash de contraseña
+        // if ($password_input !== $hashedPassword) {
+        //     $numintentos = ($numintentos ?? 0) + 1;
+        //     $bloqueado = ($numintentos >= 5) ? 1 : 0;
 
-        if ($password_input !== $hashedPassword) {
-            $numintentos = ($numintentos ?? 0) + 1;
-            $bloqueado = ($numintentos >= 5) ? 1 : 0;
+        //     $stmtUpdate = $conn->prepare("UPDATE tblAgricultores SET numintentos_int = ?, bloqueado_bit = ?, ultimointentologin_dtm = NOW() WHERE email_str = ?");
+        //     $stmtUpdate->bind_param("iis", $numintentos, $bloqueado, $email);
+        //     $stmtUpdate->execute();
 
+        //     return jsonResponse($response, ['error' => 'Contraseña incorrecta'], 401);
+        // }
+
+        // Reemplaza esto en /api/login de tu index.php:
+        if (!password_verify($password_input, $hashedPassword)) {
+            $numintentos = ($numintentos ?? 0) + 1;                         // Incrementa el contador de intentos fallidos
+            $bloqueado = ($numintentos >= 5) ? 1 : 0;                       // Bloquea el usuario si se alcanzan 5 intentos fallidos
+
+            // Actualiza la base de datos con el nuevo número de intentos y el estado de bloqueo
             $stmtUpdate = $conn->prepare("UPDATE tblAgricultores SET numintentos_int = ?, bloqueado_bit = ?, ultimointentologin_dtm = NOW() WHERE email_str = ?");
             $stmtUpdate->bind_param("iis", $numintentos, $bloqueado, $email);
             $stmtUpdate->execute();
 
+            // Devuelve un mensaje de error indicando que la contraseña es incorrecta
             return jsonResponse($response, ['error' => 'Contraseña incorrecta'], 401);
         }
-
+        
+        
         // Resetear intentos fallidos
         $stmtReset = $conn->prepare("UPDATE tblAgricultores SET numintentos_int = 0, ultimointentologin_dtm = NOW() WHERE email_str = ?");
         $stmtReset->bind_param("s", $email);

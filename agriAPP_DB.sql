@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: localhost:3306
--- Tiempo de generación: 20-05-2026 a las 21:11:37
+-- Tiempo de generación: 21-08-2026 a las 14:37:28
 -- Versión del servidor: 10.11.11-MariaDB-0+deb12u1
 -- Versión de PHP: 8.2.28
 
@@ -49,7 +49,9 @@ CREATE TABLE `tblAgricultores` (
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
   `fechaeliminacion_dtm` datetime DEFAULT NULL,
   `pref_agrupacion_str` varchar(100) DEFAULT 'finca,cultivo,fecha',
-  `pref_agrupacion_gastos_str` varchar(100) DEFAULT 'almacen,finca,fecha'
+  `pref_agrupacion_gastos_str` varchar(100) DEFAULT 'almacen,finca,fecha',
+  `pref_personal_vista_str` varchar(255) DEFAULT 'mes,trabajador',
+  `pref_personal_agrupacion_str` varchar(255) DEFAULT 'dias'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -64,7 +66,7 @@ CREATE TABLE `tblalbaran` (
   `fecha_dtm` datetime NOT NULL DEFAULT current_timestamp(),
   `kalmacen` uuid DEFAULT NULL COMMENT 'Almacen o proveedor',
   `ktipodeprecio` uuid DEFAULT NULL,
-  `ktipoalbaran` uuid NOT NULL,
+  `ktipoalbaran` varchar(36) NOT NULL,
   `fechadesde_dtm` datetime NOT NULL DEFAULT current_timestamp(),
   `fechahasta_dtm` datetime NOT NULL DEFAULT current_timestamp(),
   `numcampanias_int` int(2) NOT NULL DEFAULT 1,
@@ -143,7 +145,7 @@ DELIMITER ;
 CREATE TABLE `tblalmacen` (
   `kalmacen` uuid NOT NULL DEFAULT uuid(),
   `nombre_str` varchar(100) NOT NULL,
-  `ktipoalbaran` uuid NOT NULL DEFAULT 'b42f149b-6744-11f0-ac9b-e2b6c6b4d8df',
+  `ktipoalbaran` varchar(36) DEFAULT NULL,
   `fecha_dtm` datetime NOT NULL DEFAULT current_timestamp(),
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
   `fechaeliminacion_dtm` datetime DEFAULT NULL,
@@ -433,11 +435,10 @@ CREATE TABLE `tblpantallaidioma` (
 CREATE TABLE `tblproducto` (
   `kproducto` uuid NOT NULL DEFAULT uuid(),
   `producto_str` varchar(100) NOT NULL,
-  `ktipoalbaran` uuid NOT NULL,
+  `ktipoalbaran` varchar(36) NOT NULL,
   `fecha_dtm` datetime NOT NULL DEFAULT current_timestamp(),
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
-  `fechaeliminacion_dtm` datetime DEFAULT NULL,
-  `ktipoproducto` uuid NOT NULL
+  `fechaeliminacion_dtm` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -447,7 +448,7 @@ CREATE TABLE `tblproducto` (
 --
 
 CREATE TABLE `tbltipoalbaran` (
-  `ktipoalbaran` uuid NOT NULL DEFAULT uuid(),
+  `ktipoalbaran` varchar(36) NOT NULL,
   `kagricultor` uuid NOT NULL,
   `id_int` int(11) NOT NULL,
   `descripcion_str` varchar(100) NOT NULL,
@@ -508,21 +509,6 @@ CREATE TABLE `tbltipooperacion` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `tbltipoproducto`
---
-
-CREATE TABLE `tbltipoproducto` (
-  `ktipoproducto` uuid NOT NULL DEFAULT uuid(),
-  `descripcion_str` varchar(100) NOT NULL,
-  `fechacreacion_dtm` datetime NOT NULL DEFAULT current_timestamp(),
-  `eliminado_int` bit(1) NOT NULL DEFAULT b'0',
-  `fechaeliminacion_dtm` datetime DEFAULT NULL,
-  `kagricultor` uuid DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- Estructura de tabla para la tabla `tbltiposdeusuario`
 --
 
@@ -548,7 +534,10 @@ CREATE TABLE `tbltrabajador` (
   `telefono_str` varchar(30) DEFAULT NULL,
   `email_str` varchar(100) DEFAULT NULL,
   `eliminado_bit` bit(1) NOT NULL DEFAULT b'0',
-  `fechaeliminacion_dtm` datetime DEFAULT NULL
+  `fechaeliminacion_dtm` datetime DEFAULT NULL,
+  `fechainicioultimocontrato_dtm` date NOT NULL DEFAULT current_timestamp(),
+  `fechafinultimocontrato_dtm` date DEFAULT NULL,
+  `fecha_dtm` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -711,8 +700,7 @@ ALTER TABLE `tblpantallaidioma`
 --
 ALTER TABLE `tblproducto`
   ADD PRIMARY KEY (`kproducto`),
-  ADD KEY `fk_tblproductos_tbltipoalbaran` (`ktipoalbaran`),
-  ADD KEY `fk_tbproductos_tbltipoproductos` (`ktipoproducto`);
+  ADD KEY `ktipoalbaran` (`ktipoalbaran`);
 
 --
 -- Indices de la tabla `tbltipoalbaran`
@@ -741,14 +729,6 @@ ALTER TABLE `tbltipogasto`
 ALTER TABLE `tbltipooperacion`
   ADD PRIMARY KEY (`ktipooperacion`),
   ADD KEY `fk_tbltipooperacion_agricultor` (`kagricultor`);
-
---
--- Indices de la tabla `tbltipoproducto`
---
-ALTER TABLE `tbltipoproducto`
-  ADD PRIMARY KEY (`ktipoproducto`),
-  ADD UNIQUE KEY `descripcion_str` (`descripcion_str`),
-  ADD KEY `fk_agricultor_tipoproducto` (`kagricultor`);
 
 --
 -- Indices de la tabla `tbltiposdeusuario`
@@ -873,8 +853,7 @@ ALTER TABLE `tblpantallaidioma`
 -- Filtros para la tabla `tblproducto`
 --
 ALTER TABLE `tblproducto`
-  ADD CONSTRAINT `fk_tblproductos_tbltipoalbaran` FOREIGN KEY (`ktipoalbaran`) REFERENCES `tbltipoalbaran` (`ktipoalbaran`),
-  ADD CONSTRAINT `fk_tbproductos_tbltipoproductos` FOREIGN KEY (`ktipoproducto`) REFERENCES `tbltipoproducto` (`ktipoproducto`);
+  ADD CONSTRAINT `fk_tblproductos_tbltipoalbaran` FOREIGN KEY (`ktipoalbaran`) REFERENCES `tbltipoalbaran` (`ktipoalbaran`);
 
 --
 -- Filtros para la tabla `tbltipoalbaran`
@@ -899,12 +878,6 @@ ALTER TABLE `tbltipogasto`
 --
 ALTER TABLE `tbltipooperacion`
   ADD CONSTRAINT `fk_tbltipooperacion_agricultor` FOREIGN KEY (`kagricultor`) REFERENCES `tblAgricultores` (`kagricultor`);
-
---
--- Filtros para la tabla `tbltipoproducto`
---
-ALTER TABLE `tbltipoproducto`
-  ADD CONSTRAINT `fk_agricultor_tipoproducto` FOREIGN KEY (`kagricultor`) REFERENCES `tblAgricultores` (`kagricultor`);
 
 --
 -- Filtros para la tabla `tbltrabajador`
