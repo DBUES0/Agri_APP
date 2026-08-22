@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // Importamos el servicio que creamos antes
 import '../services/api_service.dart';
+import '../services/db_service.dart';
 
 // Importamos todos los modelos (records)
 import '../models/record_usuario.dart';
@@ -30,8 +31,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   // Los controladores capturan lo que escribes en los cuadros de texto
-  final TextEditingController _emailController = TextEditingController(text: 'davidbueso@gmail.com');
-  final TextEditingController _passwordController = TextEditingController(text: '1234a*');
+  final TextEditingController _emailController = TextEditingController(text: 'v.galdeanofernandez@gmail.com');
+  final TextEditingController _passwordController = TextEditingController(text: '');
   
   // Instanciamos nuestro servicio para usarlo luego
   final ApiService _apiService = ApiService();
@@ -64,14 +65,22 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('token', token);
       await prefs.setString('usuario_json', jsonEncode(userData));
 
+      // ¡AQUÍ ES DONDE DEBE ESTAR LA LIMPIEZA!
+      await DBService.instance.limpiarTodaLaBaseDeDatos();
+
       final usuario = Usuario.fromJson(userData);
       
       // Iniciamos la carga masiva de datos
       final fincas = (await _apiService.fetchListV('vfincas'))
           .map((json) => finca.fromJson(json)).toList();
-      final almacenes = (await _apiService.fetchList('tblalmacen'))
+      
+      // Cambiamos listar particular por listar generico para que los almacenes sean compartidos.    
+      // final almacenes = (await _apiService.fetchList('tblalmacen'))
+      //     .map((json) => Almacen.fromJson(json)).toList();
+      final almacenes = (await _apiService.fetchList('tblalmacen', isComun: true))
           .map((json) => Almacen.fromJson(json)).toList();
-      final productos = (await _apiService.fetchParticular('productos'))
+      //final productos = (await _apiService.fetchParticular('productos'))
+      final productos = (await _apiService.fetchList('tblproducto', isComun: true))
           .map((json) => Producto.fromJson(json)).toList();
       
       final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))

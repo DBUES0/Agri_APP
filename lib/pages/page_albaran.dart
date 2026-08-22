@@ -590,9 +590,23 @@ class _PageAlbaranState extends State<PageAlbaran> {
   @override
   Widget build(BuildContext context) {
     // --- PUNTO 4: FILTRADO INTELIGENTE DE ALMACENES EN EL BUILD ---
+    // Añade esto en el build antes de calcular almacenesFiltrados:
+    print("--- DEPURANDO ALMACENES ---");
+    print("Tipo actual buscado: $_currentTipoAlbaran");
+    for (var a in widget.almacenes) {
+      print("Almacén: ${a.nombreStr} | ktipoalbaran en BD: '${a.ktipoalbaran}'");
+    }
+
     final List<Almacen> almacenesFiltrados = widget.almacenes
         .where((a) => a.ktipoalbaran == _currentTipoAlbaran)
         .toList();
+        
+    print("Almacenes tras el filtro: ${almacenesFiltrados.length}");
+
+
+    // final List<Almacen> almacenesFiltrados = widget.almacenes
+    //     .where((a) => a.ktipoalbaran == _currentTipoAlbaran)
+    //     .toList();
 
     if (_selectedAlmacen != null && !almacenesFiltrados.any((a) => a.kalmacen == _selectedAlmacen)) {
       _selectedAlmacen = null;

@@ -131,5 +131,28 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
       await db.execute('DELETE FROM local_cache'); 
     }
   }
+Future<void> limpiarTodaLaBaseDeDatos() async {
+  final db = await database;
+  await db.delete('local_cache'); // Borra la caché de productos/almacenes/etc
+  await db.delete('pendientes_sincro'); // Limpia pendientes de otros
+}
+
+/// Destruye el archivo físico de la base de datos por completo.
+  /// Útil para forzar una recreación de tablas tras cambios estructurales.
+  Future<void> borrarBaseDeDatosFisica() async {
+    // 1. Cerramos la conexión actual si está abierta
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+
+    // 2. Obtenemos la ruta exacta del archivo
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'agri_app.db');
+
+    // 3. Borramos el archivo físico (método nativo de sqflite)
+    await deleteDatabase(path);
+    print("⚠️ Base de datos 'agri_app.db' ELIMINADA físicamente.");
+  }
 
 }

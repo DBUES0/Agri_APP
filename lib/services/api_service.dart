@@ -78,6 +78,7 @@ static const String baseUrl = 'https://api.bueso.online/api';
 
         if (response.statusCode == 200) {
           // CASO ÉXITO: El servidor responde con JSON válido
+          print("DEBUG: Datos recibidos en $endpoint: ${response.body.length} registros."); // <-- MIRA ESTO
           return jsonDecode(response.body);
         } 
         else if (response.statusCode >= 500) {

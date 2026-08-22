@@ -230,14 +230,18 @@ Future<void> _intentarSincroManual() async {
     // await _refreshFincas();
     await _refreshGastos();
     await _refreshOperaciones();
+    DBService.instance.limpiarTodaLaBaseDeDatos();
   }
 
-  /// Pide al servidor la lista actualizada de albaranes.
+/// Pide al servidor la lista actualizada de albaranes.
   Future<void> _refreshAlbaranes() async {
-          _albaranes = (await _apiService.fetchParticular('albaranesv2'))
-          .map((json) => Albaran.fromJson(json)).toList();
-     mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
-
+    // CAMBIO: Usamos 'albaranes' para que coincida con la tabla de la caché y el Stream
+    _albaranes = (await _apiService.fetchParticular('albaranes'))
+        .map((json) => Albaran.fromJson(json))
+        .toList();
+        
+    mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
+    setState(() {}); 
   }
 
 
@@ -250,6 +254,7 @@ Future<void> _intentarSincroManual() async {
     
     // 3. El IconoSync se actualizará solo por su Stream interno
     setState(() {}); 
+    DBService.instance.limpiarTodaLaBaseDeDatos();
   }
 
   // Los métodos _refreshGastos y _refreshOperaciones están preparados 
@@ -264,7 +269,9 @@ Future<void> _intentarSincroManual() async {
   }
 
   /// Lógica para realizar el borrado lógico (marcar como eliminado_bit = 1)
-  Future<void> _confirmDeleteAlbaran(String kalbaran) async {
+  /// Lógica para realizar el borrado lógico (marcar como eliminado_bit = 1)
+  /// Lógica para realizar el borrado lógico (marcar como eliminado_bit = 1)
+  Future<void> _confirmDeleteAlbaran(Albaran albaran) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -283,34 +290,52 @@ Future<void> _intentarSincroManual() async {
 
     if (confirm == true) {
       try {
-        // Marcar cabecera como eliminada en la BD
-        await _apiService.putGeneric('tblalbaran', kalbaran, {'eliminado_bit': 1});
+        // 1. Marcar cabecera como eliminada en la BD
+        await _apiService.putGeneric('tblalbaran', albaran.kalbaran, {'eliminado_bit': 1});
 
-        // Marcar sus detalles como eliminados en la BD
-        final albaranActual = _albaranes.firstWhere((a) => a.kalbaran == kalbaran);
-        for (var detalle in albaranActual.detalles) {
+        // 2. Marcar sus detalles como eliminados usando los datos que ya tenemos
+        for (var detalle in albaran.detalles) {
           if (detalle.kalbarandetalle.isNotEmpty) {
             await _apiService.putGeneric('tblalbarandetalle', detalle.kalbarandetalle, {'eliminado_bit': 1});
           }
         }
 
-        // Quitar de la lista visual
+        // 3. Quitar de la lista visual local
         setState(() {
-          _albaranes.removeWhere((a) => a.kalbaran == kalbaran);
+          _albaranes.removeWhere((a) => a.kalbaran == albaran.kalbaran);
         });
+
+        mensajeEmergente(context, "Albarán eliminado correctamente");
       } catch (e) {
-        // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: colorEliminar));
-         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'), 
-              backgroundColor: colorEliminar,
-              behavior: SnackBarBehavior.floating, // Hace que flote sobre los botones
-              margin: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
-            ),
-          );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'), 
+            backgroundColor: colorEliminar,
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+          ),
+        );
       }
     }
   }
+  // Future<void> _confirmDeleteAlbaran(String kalbaran) async {
+  //   final confirm = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('¿Eliminar Albarán?'),
+  //       content: const Text('Se ocultará el albarán y sus productos asociados.'),
+  //       actions: [
+  //         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+  //         ElevatedButton(
+  //           style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
+  //           onPressed: () => Navigator.pop(context, true),
+  //           child: const Text('Confirmar', style: TextStyle(color: colorFondo)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+
 
   /// Navega a la pantalla de edición/creación de Albarán.
   void _goToAlbaran({Albaran? albaran}) async {
@@ -678,7 +703,8 @@ Widget build(BuildContext context) {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(icon: const Icon(Icons.edit),  color: AgriPalette.greenMain, onPressed: () => _goToAlbaran(albaran: albaran)),
-                                      IconButton(icon: const Icon(Icons.delete),  color: AgriPalette.greenMain, onPressed: () => _confirmDeleteAlbaran(albaran.kalbaran)),
+                                      // IconButton(icon: const Icon(Icons.delete),  color: AgriPalette.greenMain, onPressed: () => _confirmDeleteAlbaran(albaran.kalbaran)),
+                                      IconButton(icon: const Icon(Icons.delete),  color: AgriPalette.greenMain, onPressed: () => _confirmDeleteAlbaran(albaran)),
                                     ],
                                   ),
                                   onTap: () => setState(() => _expandedAlbaranes[aEntry.key] = !expanded),
@@ -1440,7 +1466,8 @@ Widget _construirNivelDinamicamente(List<MovimientoVisual> datosNodo, List<Strin
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, size: 20, color: AgriPalette.greenMain),
-                  onPressed: () => _confirmDeleteAlbaran(m.albaranPadre.kalbaran),
+                  // onPressed: () => _confirmDeleteAlbaran(m.albaranPadre.kalbaran),
+                  onPressed: () => _confirmDeleteAlbaran(m.albaranPadre),
                 ),
               ],
             ),

@@ -1104,8 +1104,8 @@ $app->get('/api/listarcomun/{tabla}', function (Request $request, Response $resp
     $tabla = $args['tabla'];
 
     // Lista blanca de tablas común
-    $tablasComunes = [
-        'tblproducto', 'tbltipodeprecio', 'tbltipogasto', 'tbltipooperacion', 'tbltiposdeusuario'
+$tablasComunes = [
+        'tblproducto', 'tbltipodeprecio', 'tbltipogasto', 'tbltipooperacion', 'tbltiposdeusuario', 'tblalmacen'
     ];
 
     if (!in_array($tabla, $tablasComunes)) {

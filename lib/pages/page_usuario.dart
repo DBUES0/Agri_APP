@@ -12,6 +12,7 @@ import '../pages/page_dashboard.dart';
 import '../services/api_service.dart'; 
 import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
+import '../services/db_service.dart';
 
 class UsuarioPage extends StatefulWidget {
   final Usuario usuario;
@@ -280,6 +281,10 @@ Future<void> _guardarCambiosYContinuar() async {
           icon: const Icon(Icons.arrow_back),
           onPressed: _volverSinGuardar,
         ),
+          actions: [
+          IconButton(icon: const Icon(Icons.attach_file), color: AgriPalette.greenMain, onPressed: null),
+          IconButton(icon: const Icon(Icons.spa_sharp), color: AgriPalette.greenMain, onPressed: DBService.instance.borrarBaseDeDatosFisica),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
