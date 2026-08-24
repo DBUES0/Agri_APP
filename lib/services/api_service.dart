@@ -1,3 +1,4 @@
+// lib/services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,8 +70,13 @@ static const String baseUrl = 'https://api.bueso.online/api';
   }
 
   // 2. Listar tablas genéricas (fincas, almacenes...)
-    Future<List<dynamic>> fetchList(String endpoint, {bool isComun = false}) async {
-      final url = Uri.parse('$baseUrl${isComun ? '/listarcomun/' : '/listar/'}$endpoint');
+    // Future<List<dynamic>> fetchList(String endpoint, {bool isComun = false}) async {
+     Future<List<dynamic>> fetchList(String endpoint, {bool isComun = false, bool isMixto = false}) async {
+      String tipoRuta = 'listar';
+      if (isComun) tipoRuta = 'listarcomun';
+      if (isMixto) tipoRuta = 'listarmixto';
+      // final url = Uri.parse('$baseUrl${isComun ? '/listarcomun/' : '/listar/'}$endpoint');
+      final url = Uri.parse('$baseUrl/$tipoRuta/$endpoint');
 
       try {
         // Añadimos un timeout para que la App no se quede "colgada" si el proxy no responde
@@ -145,7 +151,7 @@ static const String baseUrl = 'https://api.bueso.online/api';
       }
     }
 
-
+// 3. Listar tablas particulares (productos, albaranes...)
 Future<List<dynamic>> fetchParticular(String endpoint) async {
   final url = Uri.parse('$baseUrl/$endpoint');
   

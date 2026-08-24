@@ -1,3 +1,4 @@
+//record_producto.dart
 class Producto {
   final String kproducto;
   final String productoStr;

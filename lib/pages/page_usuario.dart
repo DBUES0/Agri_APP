@@ -9,6 +9,9 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../pages/page_dashboard.dart'; 
+import '../pages/page_almacen.dart';
+import '../pages/page_producto.dart';
+import '../pages/page_finca.dart';
 import '../services/api_service.dart'; 
 import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
@@ -336,6 +339,46 @@ Future<void> _guardarCambiosYContinuar() async {
 
             const SizedBox(height: 40),
             
+            // Añade esto dentro del ListView de page_usuario.dart, por ejemplo debajo de las preferencias:
+            const SizedBox(height: 30),
+            Text(
+              'Gestión de Catálogos y Fincas', 
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AgriPalette.greenMain)
+            ),
+            const Divider(),
+            const SizedBox(height: 0),
+
+            ListTile(
+              leading: const Icon(Icons.landscape, color: AgriPalette.greenMain),
+              title: const Text('Gestionar Fincas'),
+              //subtitle: const Text('Altas, bajas y modificaciones de fincas propias'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => PageFincasCRUD(usuario: widget.usuario, fincas: widget.fincas))
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.store, color: AgriPalette.greenMain),
+              title: const Text('Gestionar Almacenes'),
+              //subtitle: const Text('Proveedores y almacenes de destino'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => PageAlmacenesCRUD(usuario: widget.usuario, almacenes: widget.almacen))
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.shopping_basket, color: AgriPalette.greenMain),
+              title: const Text('Gestionar Productos / Conceptos'),
+              //subtitle: const Text('Catálogo de productos y gastos'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (context) => PageProductosCRUD(usuario: widget.usuario, productos: widget.producto))
+              ),
+            ),
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AgriPalette.greenMain,

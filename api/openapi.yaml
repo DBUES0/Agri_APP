@@ -1011,6 +1011,384 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+/api/listarmixto/{tabla}:
+    get:
+      tags: [Genéricas]
+      summary: Listar registros mixtos (propios del agricultor y globales del maestro)
+      description: Devuelve los registros de la tabla especificada que pertenecen al agricultor autenticado o al agricultor maestro.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [tblalmacen, tblproducto, tblfinca]
+            example: tblalmacen
+      responses:
+        '200':
+          description: Lista de registros mixtos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tabla no permitida para listado mixto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/vista/{tabla}:
+    get:
+      tags: [Genéricas]
+      summary: Listar registros de una vista específica para el agricultor autenticado
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [vfincas]
+            example: vfincas
+      responses:
+        '200':
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: vista no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'              
+
+  /api/listarcomun/{tabla}:
+    get:
+      tags: [Genéricas]
+      summary: Listar registros de una tabla común (sin restricción por agricultor)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [tblproducto, tbltipodeprecio, tbltipogasto, tbltipooperacion, tbltiposdeusuario]
+            example: tblproducto
+      responses:
+        '200':
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tabla no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/editar/{tabla}/{id}:
+    put:
+      tags: [Genéricas]
+      summary: Editar un registro en una tabla específica
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            example: tblfinca
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 123e4567-e89b-12d3-a456-426614174000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                nombre_str: "Nuevo nombre"
+                descripcion_str: "Nueva descripción"
+      responses:
+        '200':
+          description: Registro actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: Registro actualizado correctamente
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: No autorizado o registro no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/eliminar/{tabla}/{id}:
+    delete:
+      tags: [Genéricas]
+      summary: Marcar un registro como eliminado (borrado lógico)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            example: tblfinca
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        '200':
+          description: Registro marcado como eliminado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: Registro marcado como eliminado
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: No autorizado o registro no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/crear/{tabla}:
+    post:
+      tags: [Genéricas]
+      summary: Crear un nuevo registro en una tabla específica
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tabla
+          in: path
+          required: true
+          schema:
+            type: string
+            example: tbloperacion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                ktipooperacion: "456e4567-e89b-12d3-a456-426614174000"
+                fechainicio_dtm: "2025-04-15 08:00:00"
+                fechafin_dtm: "2025-04-15 18:00:00"
+                descripcion_str: "Recolección de manzanas"
+                numpersonas_int: 5
+      responses:
+        '200':
+          description: Registro creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: Registro insertado correctamente
+                  tabla:
+                    type: string
+                    example: tbloperacion
+                  uuid:
+                    type: string
+                    example: 123e4567-e89b-12d3-a456-426614174000
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tabla no permitida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/operaciones:
+    get:
+      tags: [Operaciones]
+      summary: Listar todas las operaciones del agricultor autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de operaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Operacion'
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/operaciones/{desde}/{hasta}:
+    get:
+      tags: [Operaciones]
+      summary: Listar operaciones del agricultor entre dos fechas
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: desde
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+            example: 2025-04-01
+        - name: hasta
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+            example: 2025-04-30
+      responses:
+        '200':
+          description: Lista de operaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Operacion'
+        '401':
+          description: Token no proporcionado o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 
   /api/vista/{tabla}:
     get:

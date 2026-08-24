@@ -198,6 +198,7 @@ Future<void> _logout() async {
     try {
       // Intentamos una última sincro antes de irnos
       await SyncService.sincronizarTodo();
+      DBService.instance.limpiarTodaLaBaseDeDatos();
       if (mounted) await _apiService.cerrarSesion(context);
     } catch (e) {
       // Si falla por token, cerramos sesión igualmente

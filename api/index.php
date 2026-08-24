@@ -1077,6 +1077,40 @@ $app->get('/api/listar/{tabla}', function (Request $request, Response $response,
     return jsonResponse($response, $datos);
 });
 
+// ENDPOINT MIXTO: Listar registros del propio agricultor y del maestro (protegida por JWT)
+$app->get('/api/listarmixto/{tabla}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
+    $tabla = $args['tabla'];
+    $jwt = $request->getAttribute('jwt');
+    $kagricultor = $jwt->sub;
+    
+    // UUID del agricultor maestro fijo
+    $masterAgricultorId = '6223c8a4-0f95-11f0-ab54-e2b6c6b4d8df';
+
+    // Lista blanca de tablas permitidas para este comportamiento mixto
+    $tablasPermitidas = ['tblalmacen', 'tblproducto', 'tblfinca']; 
+    if (!in_array($tabla, $tablasPermitidas)) {
+        return jsonResponse($response, ["error" => "Tabla no permitida para listado mixto"], 403);
+    }
+
+    $conn = conectarDB($servername, $username, $password, $dbname);
+    
+    // Seleccionamos los del usuario O los del maestro, filtrando borrados
+    $stmt = $conn->prepare("
+        SELECT * FROM `$tabla` 
+        WHERE (kagricultor = ? OR kagricultor = ?) 
+        AND (eliminado_bit IS NULL OR eliminado_bit = 0 OR eliminado_bit = b'0')
+    ");
+    $stmt->bind_param("ss", $kagricultor, $masterAgricultorId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $datos = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    $conn->close();
+
+    return jsonResponse($response, $datos);
+});
+
+
 // ENDPOINT GENÉRICO: Listar vista por agricultor (protegida por JWT)
 $app->get('/api/vista/{tabla}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {
     $tabla = $args['tabla'];

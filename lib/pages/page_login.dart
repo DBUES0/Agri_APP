@@ -1,3 +1,4 @@
+//page_login.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Necesario para TextInput.finishAutofillContext()
@@ -77,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
       // Cambiamos listar particular por listar generico para que los almacenes sean compartidos.    
       // final almacenes = (await _apiService.fetchList('tblalmacen'))
       //     .map((json) => Almacen.fromJson(json)).toList();
-      final almacenes = (await _apiService.fetchList('tblalmacen', isComun: true))
+      final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
           .map((json) => Almacen.fromJson(json)).toList();
       //final productos = (await _apiService.fetchParticular('productos'))
       final productos = (await _apiService.fetchList('tblproducto', isComun: true))

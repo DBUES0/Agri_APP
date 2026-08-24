@@ -1,4 +1,4 @@
-
+//record_finca.dart
 class finca {
   final String kfinca;
   final String kfincapadre;
