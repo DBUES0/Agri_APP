@@ -1,3 +1,4 @@
+//page_albaran.dart
 import 'package:agriapp/services/db_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -422,7 +423,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
   void _mostrarDialogoDetalle({AlbaranDetalle? detalle}) {
     
     // Filtramos la lista de productos en caliente basándonos en el tipo de documento activo
-// AÑADE ESTO PARA DEPURAR
+    // AÑADE ESTO PARA DEPURAR
     print("Tipo de Albarán Actual: $_currentTipoAlbaran");
     print("Total de productos en memoria: ${widget.productos.length}");
     for(var p in widget.productos) {
@@ -457,6 +458,14 @@ class _PageAlbaranState extends State<PageAlbaran> {
       if (productosFiltrados.isNotEmpty) {
         _selectedProducto = productosFiltrados[0].kproducto; 
       }
+    }
+
+    // AÑADE ESTE SALVAVIDAS AQUÍ (Justo antes de showDialog):
+    if (_selectedFinca != null && !widget.fincas.any((f) => f.kfinca == _selectedFinca)) {
+      _selectedFinca = null;
+    }
+    if (_selectedProducto != null && !productosFiltrados.any((p) => p.kproducto == _selectedProducto)) {
+      _selectedProducto = null;
     }
 
     showDialog(

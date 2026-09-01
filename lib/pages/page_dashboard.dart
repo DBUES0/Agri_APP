@@ -1,5 +1,5 @@
+//page_dashboard.dart
 import 'dart:convert';
-
 import 'package:agriapp/pages/page_usuario.dart';
 import 'package:agriapp/services/db_service.dart';
 import 'package:agriapp/services/sync_service.dart';
@@ -106,7 +106,8 @@ void initState() {
 Stream<List<Albaran>> _getAlbaranesStream() async* {
   while (true) {
     // 1. Albaranes de la caché (API)
-    final localData = await DBService.instance.getAllFromLocal('albaranes');
+    //final localData = await DBService.instance.getAllFromLocal('albaranes');
+    final localData = await DBService.instance.getAllFromLocal('albaranesv2'); 
     List<Albaran> albaranesAPI = localData.map((json) => Albaran.fromJson(json)).toList();
 
     // 2. Albaranes pendientes de subir (Offline)
@@ -235,27 +236,52 @@ Future<void> _intentarSincroManual() async {
   }
 
 /// Pide al servidor la lista actualizada de albaranes.
+  // Future<void> _refreshAlbaranes() async {
+  //   // CAMBIO: Usamos 'albaranes' para que coincida con la tabla de la caché y el Stream
+  //   _albaranes = (await _apiService.fetchParticular('albaranes'))
+  //       .map((json) => Albaran.fromJson(json))
+  //       .toList();
+        
+  //   mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
+  //   setState(() {}); 
+  // }
+
   Future<void> _refreshAlbaranes() async {
-    // CAMBIO: Usamos 'albaranes' para que coincida con la tabla de la caché y el Stream
-    _albaranes = (await _apiService.fetchParticular('albaranes'))
+    // ¡OBLIGATORIO USAR albaranesv2!
+    _albaranes = (await _apiService.fetchParticular('albaranesv2'))
         .map((json) => Albaran.fromJson(json))
         .toList();
         
-    mensajeEmergente(context, 'Albaranes Actualizados', segundos: 1);
+    mensajeEmergente(context, 'Datos Actualizados', segundos: 1);
     setState(() {}); 
   }
 
 
+  // Future<void> _superRefresh() async {
+  //   // 1. Primero intentamos subir lo que haya pendiente
+  //   await SyncService.sincronizarTodo();
+    
+  //   // 2. Después bajamos lo último del servidor
+  //   await _refreshAlbaranes();
+    
+  //   // 3. El IconoSync se actualizará solo por su Stream interno
+  //   setState(() {}); 
+  //   DBService.instance.limpiarTodaLaBaseDeDatos();
+  // }
+
+/// Sincroniza todo al iniciar o al pulsar el botón
   Future<void> _superRefresh() async {
     // 1. Primero intentamos subir lo que haya pendiente
     await SyncService.sincronizarTodo();
     
-    // 2. Después bajamos lo último del servidor
+    // 2. Después bajamos lo último del servidor con el endpoint correcto
     await _refreshAlbaranes();
     
-    // 3. El IconoSync se actualizará solo por su Stream interno
+    // 3. Refrescamos la pantalla
     setState(() {}); 
-    DBService.instance.limpiarTodaLaBaseDeDatos();
+    
+    // ELIMINADO: DBService.instance.limpiarTodaLaBaseDeDatos(); 
+    // ¡Nunca borres la caché aquí o romperás el modo offline!
   }
 
   // Los métodos _refreshGastos y _refreshOperaciones están preparados 

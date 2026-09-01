@@ -411,7 +411,8 @@ Future<void> guardarAlbaranOffline(Map<String, dynamic> albaranData) async {
   final db = await DBService.instance.database;
 
   // 1. Lo guardamos en la caché local para que el usuario lo vea YA
-  await DBService.instance.saveToCache('albaranes', [albaranData]);
+  //await DBService.instance.saveToCache('albaranes', [albaranData]);
+  await DBService.instance.saveToCache('albaranesv2', [albaranData]);
 
   // 2. Lo anotamos en la lista de pendientes
   await db.insert('pendientes_sincro', {

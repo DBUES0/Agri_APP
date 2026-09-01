@@ -96,7 +96,8 @@ class _LoginPageState extends State<LoginPage> {
       final trabajadores = (await _apiService.fetchList('tbltrabajador'))
           .map((json) => Trabajador.fromJson(json)).toList();
 
-      final albaranes = (await _apiService.fetchParticular('albaranes'))
+      //final albaranes = (await _apiService.fetchParticular('albaranes'))
+      final albaranes = (await _apiService.fetchParticular('albaranesv2'))
           .map((json) => Albaran.fromJson(json)).toList();
 
       if (!mounted) return;
