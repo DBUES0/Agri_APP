@@ -1,11 +1,18 @@
+//page_trabajador_add.dart
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
-import 'package:intl/intl.dart'; // Importa intl para formatear fechas si lo tienes, o usa toIso8601String()
+import 'package:intl/intl.dart'; 
 import 'package:uuid/uuid.dart';
 
+// --- ¡FALTABA ESTA IMPORTACIÓN! ---
+import '../models/record_trabajador.dart';
+
 class PageTrabajadorForm extends StatefulWidget {
-  const PageTrabajadorForm({Key? key}) : super(key: key);
+  final Trabajador? trabajador; 
+  
+  // --- ¡FALTABA AÑADIR this.trabajador AQUÍ! ---
+  const PageTrabajadorForm({Key? key, this.trabajador}) : super(key: key);
 
   @override
   State<PageTrabajadorForm> createState() => _PageTrabajadorFormState();
@@ -27,11 +34,35 @@ class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
   DateTime? _fechaFin;
 
   final ApiService _apiService = ApiService();
-
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // Si viene un trabajador (Estamos editando) rellenamos los datos
+    if (widget.trabajador != null) {
+      final t = widget.trabajador!;
+      _nombreController.text = t.nombreStr;
+      _dniController.text = t.dniStr ?? '';
+      _telefonoController.text = t.telefonoStr ?? '';
+      _emailController.text = t.emailStr ?? '';
+      
+      _fechaInicio = t.fechainicioultimocontratoDtm;
+      if (_fechaInicio != null) _fechaInicioController.text = DateFormat('yyyy-MM-dd').format(_fechaInicio!);
+      
+      _fechaFin = t.fechafinultimocontratoDtm;
+      if (_fechaFin != null) _fechaFinController.text = DateFormat('yyyy-MM-dd').format(_fechaFin!);
+    } else {
+      // Si es nuevo, ponemos la fecha de hoy por defecto
+      _fechaInicio = DateTime.now();
+      _fechaInicioController.text = DateFormat('yyyy-MM-dd').format(_fechaInicio!);
+    }
+  }
+  
   Future<void> _selectDate(BuildContext context, bool esInicio) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: esInicio ? (_fechaInicio ?? DateTime.now()) : (_fechaFin ?? DateTime.now()),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
@@ -51,27 +82,33 @@ class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // GENERAR UUID LOCALMENTE
-    final String nuevoId = const Uuid().v4();
-
     try {
-        final nuevoTrabajador = {
-          'ktrabajador': nuevoId, // Enviamos el ID ya generado
-          'nombre_str': _nombreController.text,
-          'dni_str': _dniController.text,
-          'telefono_str': _telefonoController.text,
-          'email_str': _emailController.text,
-          'fechainicioultimocontrato_dtm': _fechaInicio?.toIso8601String(),
-          'fechafinultimocontrato_dtm': _fechaFin?.toIso8601String(),
-          'eliminado_bit': 0, // ENVIAR SIEMPRE COMO INT (0)
-        };
+      final trabajadorData = {
+        'nombre_str': _nombreController.text,
+        'dni_str': _dniController.text,
+        'telefono_str': _telefonoController.text,
+        'email_str': _emailController.text,
+        'fechainicioultimocontrato_dtm': _fechaInicio?.toIso8601String(),
+        'fechafinultimocontrato_dtm': _fechaFin?.toIso8601String(),
+        'eliminado_bit': 0,
+      };
 
-      await _apiService.postGeneric('tbltrabajador', nuevoTrabajador);
+      if (widget.trabajador == null) {
+        // CREAR NUEVO
+        trabajadorData['ktrabajador'] = const Uuid().v4();
+        await _apiService.postGeneric('tbltrabajador', trabajadorData);
+        if (!mounted) return;
+        mensajeEmergente(context, "Trabajador creado correctamente");
+      } else {
+        // EDITAR EXISTENTE
+        await _apiService.putGeneric('tbltrabajador', widget.trabajador!.ktrabajador, trabajadorData);
+        if (!mounted) return;
+        mensajeEmergente(context, "Trabajador modificado correctamente");
+      }
       
-      if (!mounted) return;
-      mensajeEmergente(context, "Trabajador creado correctamente");
       Navigator.pop(context, true);
     } catch (e) {
+      if (!mounted) return;
       mensajeEmergente(context, "Error: $e", tipo: 'error');
     }
   }
@@ -90,12 +127,12 @@ class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Nuevo Trabajador")),
+      appBar: AppBar(title: Text(widget.trabajador == null ? "Nuevo Trabajador" : "Editar Trabajador")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: ListView( // ListView evita problemas con el teclado
+          child: ListView(
             children: [
               TextFormField(
                 controller: _nombreController,
@@ -126,7 +163,7 @@ class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
               TextFormField(
                 controller: _fechaFinController,
                 readOnly: true,
-                decoration: const InputDecoration(labelText: 'Fecha Fin Contrato (Opcional)', icon: Icon(Icons.calendar_today)),
+                decoration: const InputDecoration(labelText: 'Fecha Fin Contrato (Opcional)', icon: Icon(Icons.event_busy)),
                 onTap: () => _selectDate(context, false),
               ),
               const SizedBox(height: 30),
