@@ -37,7 +37,7 @@ class Usuario {
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
       // 3. CAPTURAMOS EL UUID QUE ENVÍA TU API AL HACER LOGIN
-      kagricultor: json['kagricultor'] ?? '', 
+      kagricultor: json['kagricultor'] ?? '', // <-- Asegúrate de que mapea esto
       nombre: json['nombre_str'] ?? '',
       apellidos: json['apellidos_str'] ?? '',
       dni: json['dni_str'] ?? '',

@@ -156,7 +156,7 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
         $conn->close();
 
         // Eliminar campos sensibles
-        unset($usuario['kagricultor']);
+        //unset($usuario['kagricultor']);
         unset($usuario['password_str']);
 
         // Generar token

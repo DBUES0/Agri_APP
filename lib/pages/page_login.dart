@@ -42,6 +42,101 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false; // Para mostrar un circulito de carga
 
   // Función principal de Login
+  // Future<void> _login() async {
+  //   setState(() {
+  //     _error = '';
+  //     _isLoading = true; 
+  //   });
+
+  //   try {
+  //     // Llamamos al servicio
+  //     final response = await _apiService.postLogin(
+  //       _emailController.text.trim(),
+  //       _passwordController.text,
+  //     );
+
+  //     final String token = response['token'];
+  //     final Map<String, dynamic>? userData = response['usuario'];
+
+  //     if (userData == null) {
+  //       throw 'El servidor no devolvió los datos del usuario (clave "usuario" no encontrada).';
+  //     }
+
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.setString('token', token);
+  //     await prefs.setString('usuario_json', jsonEncode(userData));
+
+  //     // ¡AQUÍ ES DONDE DEBE ESTAR LA LIMPIEZA!
+  //     await DBService.instance.limpiarTodaLaBaseDeDatos();
+
+  //     final usuario = Usuario.fromJson(userData);
+      
+  //     // Iniciamos la carga masiva de datos
+  //     final fincas = (await _apiService.fetchListV('vfincas'))
+  //         .map((json) => finca.fromJson(json)).toList();
+      
+  //     // Cambiamos listar particular por listar generico para que los almacenes sean compartidos.    
+  //     // final almacenes = (await _apiService.fetchList('tblalmacen'))
+  //     //     .map((json) => Almacen.fromJson(json)).toList();
+  //     final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
+  //         .map((json) => Almacen.fromJson(json)).toList();
+  //     //final productos = (await _apiService.fetchParticular('productos'))
+  //     final productos = (await _apiService.fetchList('tblproducto', isComun: true))
+  //         .map((json) => Producto.fromJson(json)).toList();
+      
+  //     final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
+  //         .map((json) => Tipogasto.fromJson(json)).toList();
+
+  //     final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
+  //         .map((json) => Tipodeprecio.fromJson(json)).toList();
+
+  //     final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
+  //         .map((json) => Tipooperacion.fromJson(json)).toList();
+
+  //     final trabajadores = (await _apiService.fetchList('tbltrabajador'))
+  //         .map((json) => Trabajador.fromJson(json)).toList();
+
+  //     //final albaranes = (await _apiService.fetchParticular('albaranes'))
+  //     final albaranes = (await _apiService.fetchParticular('albaranesv2'))
+  //         .map((json) => Albaran.fromJson(json)).toList();
+
+  //     if (!mounted) return;
+
+  //     // 1. Cerramos el contexto de autocompletado para que el navegador/sistema 
+  //     // ofrezca guardar la contraseña si el usuario lo desea.
+  //     TextInput.finishAutofillContext();
+      
+      
+  //     // 2. Navegamos a la siguiente pantalla pasando todos los datos cargados
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => UsuarioPage(
+  //           usuario: usuario,
+  //           fincas: fincas,
+  //           tiposGasto: tiposGasto,
+  //           almacen: almacenes,
+  //           producto: productos,
+  //           tipodeprecio: tiposPrecio,
+  //           tipooperacion: operaciones,
+  //           trabajador: trabajadores,
+  //           albaranes: albaranes,
+  //         ),
+  //       ),
+  //     );
+  //   } catch (e) {
+  //     setState(() {
+  //       _error = 'Error al entrar: $e';
+  //     });
+  //   } finally {
+  //     setState(() {
+  //       _isLoading = false; 
+  //     });
+  //   }
+  // }
+
+
+// Función principal de Login
   Future<void> _login() async {
     setState(() {
       _error = '';
@@ -66,24 +161,47 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('token', token);
       await prefs.setString('usuario_json', jsonEncode(userData));
 
-      // ¡AQUÍ ES DONDE DEBE ESTAR LA LIMPIEZA!
+      // Limpieza de base de datos local
       await DBService.instance.limpiarTodaLaBaseDeDatos();
 
+      // 1. PRIMERO declaramos el usuario original leyendo el JSON
       final usuario = Usuario.fromJson(userData);
       
-      // Iniciamos la carga masiva de datos
+      // 2. LUEGO cargamos las fincas (las necesitamos por si el usuario viene sin ID)
       final fincas = (await _apiService.fetchListV('vfincas'))
           .map((json) => finca.fromJson(json)).toList();
+
+      // 3. APLICAMOS EL SALVAVIDAS
+      String idReal = usuario.kagricultor;
+      if (idReal.isEmpty && fincas.isNotEmpty) {
+         idReal = fincas.first.kagricultor;
+      }
       
-      // Cambiamos listar particular por listar generico para que los almacenes sean compartidos.    
-      // final almacenes = (await _apiService.fetchList('tblalmacen'))
-      //     .map((json) => Almacen.fromJson(json)).toList();
+      // 4. CLONAMOS el usuario asegurando que tiene su ID correcto
+      final usuarioCorregido = Usuario(
+        kagricultor: idReal,
+        nombre: usuario.nombre,
+        apellidos: usuario.apellidos,
+        dni: usuario.dni,
+        direccion: usuario.direccion,
+        email: usuario.email,
+        telefono: usuario.telefono,
+        validado: usuario.validado,
+        bloqueado: usuario.bloqueado,
+        intentos: usuario.intentos,
+        ultimoIntento: usuario.ultimoIntento,
+        tipoUsuario: usuario.tipoUsuario,
+        prefAgrupacion: usuario.prefAgrupacion,
+        prefAgrupacionGastos: usuario.prefAgrupacionGastos,
+      );
+      
+      // 5. SEGUIMOS cargando el resto de datos de la API (Almacenes Mixtos, etc.)
       final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
           .map((json) => Almacen.fromJson(json)).toList();
-      //final productos = (await _apiService.fetchParticular('productos'))
+          
       final productos = (await _apiService.fetchList('tblproducto', isComun: true))
           .map((json) => Producto.fromJson(json)).toList();
-      
+          
       final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
           .map((json) => Tipogasto.fromJson(json)).toList();
 
@@ -96,22 +214,20 @@ class _LoginPageState extends State<LoginPage> {
       final trabajadores = (await _apiService.fetchList('tbltrabajador'))
           .map((json) => Trabajador.fromJson(json)).toList();
 
-      //final albaranes = (await _apiService.fetchParticular('albaranes'))
       final albaranes = (await _apiService.fetchParticular('albaranesv2'))
           .map((json) => Albaran.fromJson(json)).toList();
 
       if (!mounted) return;
 
-      // 1. Cerramos el contexto de autocompletado para que el navegador/sistema 
-      // ofrezca guardar la contraseña si el usuario lo desea.
+      // Cerramos el contexto de autocompletado
       TextInput.finishAutofillContext();
       
-      // 2. Navegamos a la siguiente pantalla pasando todos los datos cargados
+      // 6. Navegamos pasando el usuarioCorregido
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => UsuarioPage(
-            usuario: usuario,
+            usuario: usuarioCorregido, // <--- AQUÍ PASAMOS EL USUARIO CON EL SALVAVIDAS
             fincas: fincas,
             tiposGasto: tiposGasto,
             almacen: almacenes,
