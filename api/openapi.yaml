@@ -230,6 +230,19 @@ paths:
               schema:
                 type: string
 
+
+  /api/info:
+    get:
+      tags: [public]
+      summary: Acceso a la información actualizada de la aplicación y novedades
+      responses:
+        '200':
+          description: Información actualizada de la aplicación y novedades
+          content:
+            application/json:
+              schema:
+                type: string
+
   /swagger.json:
     get:
       tags: [Autenticación]

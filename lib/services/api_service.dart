@@ -593,5 +593,19 @@ Future<void> postGeneric(String tabla, Map<String, dynamic> data) async {
   }
 }
 
+// Obtener mensaje dinámico para el Login
+  Future<String?> getAppInfo() async {
+    final url = Uri.parse('$baseUrl/info');
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body)['mensaje'];
+      }
+    } catch (_) {
+      // Si hay error de red o timeout, devolvemos null y no mostramos nada
+    }
+    return null; 
+  }
+
 }
 

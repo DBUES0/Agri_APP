@@ -1,6 +1,6 @@
 <?php
 // index.php
-
+$mensajeinicial =  "Novedades AgriAPP v1.2:\n- Módulo de personal y jornadas integrado.\n- Mejora en sincronización offline.\n- Corrección de bugs menores en albaranes.";
 require 'vendor/autoload.php';
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -180,7 +180,13 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
     }
 });
 
-
+// Endpoint público para información y novedades en el Login
+$app->get('/api/info', function (Request $request, Response $response) {
+    // Puedes editar este texto directamente aquí siempre que quieras
+    $mensaje = $mensajeinicial ?? "Bienvenido a la aplicación de gestión agrícola. Mantente al tanto de las últimas novedades y actualizaciones.";
+    
+    return jsonResponse($response, ['mensaje' => $mensaje]);
+});
 
 // Ruta de prueba
 $app->get('/', function (Request $request, Response $response) {
