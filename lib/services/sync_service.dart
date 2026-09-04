@@ -15,9 +15,19 @@ class SyncService {
   static void startAutoSync() {
     if (_syncTimer != null) return;
     print("--- TRABAJADOR DE SINCRONIZACIÓN INICIADO ---");
-    _syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      await sincronizarTodo();
-    });
+    try {
+      // Código de sincronización...
+      _syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+        await sincronizarTodo();
+      });
+    } catch (e) {
+      if (e.toString().contains("Expired token") || e.toString().contains("401")) {
+        print("Sincronización abortada: Token caducado. Deteniendo servicio.");
+        // AQUÍ: Asegúrate de detener cualquier Timer o bucle periódico de sincronización
+        return; 
+      }
+    }
+
   }
 
   /// Apaga el motor
