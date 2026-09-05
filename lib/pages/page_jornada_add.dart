@@ -1,11 +1,9 @@
-//page_jornada_add.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/record_trabajador.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
-import 'package:intl/date_symbol_data_local.dart';
 
 class PageJornadaAdd extends StatefulWidget {
   final List<Trabajador> trabajadores;
@@ -21,14 +19,15 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
   
   DateTime _fechaSeleccionada = DateTime.now();
   final TextEditingController _horarioController = TextEditingController();
-  final TextEditingController _horasController = TextEditingController();
+  final TextEditingController _horasGlobalController = TextEditingController();
 
   List<Trabajador> _activosEnFecha = [];
   bool _seleccionarTodos = false;
   
-  // Mapas para controlar el estado de cada trabajador individualmente
+  // Mapas para controlar el estado y textos de cada trabajador individualmente
   final Map<String, bool> _checksTrabajadores = {};
   final Map<String, TextEditingController> _obsControllers = {};
+  final Map<String, TextEditingController> _horasIndividualesControllers = {};
 
   bool _cargando = true;
   bool _guardando = false;
@@ -45,12 +44,10 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
     if (mounted) setState(() => _cargando = false);
   }
 
-  // Busca el último horario registrado en la base de datos
   Future<void> _cargarUltimoHorario() async {
     try {
       final jornadas = await _apiService.fetchList('tbljornada');
       if (jornadas.isNotEmpty) {
-        // Ordenamos para coger la más reciente
         jornadas.sort((a, b) => (b['fecha_dtm'] ?? '').compareTo(a['fecha_dtm'] ?? ''));
         
         final ultima = jornadas.firstWhere(
@@ -60,7 +57,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
 
         if (ultima.isNotEmpty) {
           _horarioController.text = ultima['horario_str'].toString();
-          _horasController.text = ultima['horas_flt']?.toString() ?? '';
+          _horasGlobalController.text = ultima['horas_flt']?.toString() ?? '';
         }
       }
     } catch (e) {
@@ -68,7 +65,6 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
     }
   }
 
-  // Filtra los trabajadores que estaban dados de alta en la fecha seleccionada
   void _filtrarTrabajadoresPorFecha() {
     final fechaLimpia = DateTime(_fechaSeleccionada.year, _fechaSeleccionada.month, _fechaSeleccionada.day);
 
@@ -88,11 +84,11 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       return esActivo;
     }).toList();
 
-    // Resetear selecciones
     _seleccionarTodos = false;
     for (var t in _activosEnFecha) {
       _checksTrabajadores[t.ktrabajador] = false;
-      _obsControllers[t.ktrabajador] ??= TextEditingController(); // Mantenemos el texto si ya existía
+      _obsControllers[t.ktrabajador] ??= TextEditingController(); 
+      _horasIndividualesControllers[t.ktrabajador] ??= TextEditingController();
     }
     setState(() {});
   }
@@ -119,6 +115,24 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       _seleccionarTodos = valor ?? false;
       for (var t in _activosEnFecha) {
         _checksTrabajadores[t.ktrabajador] = _seleccionarTodos;
+        // Al seleccionar, copiamos las horas globales al trabajador individual
+        if (_seleccionarTodos) {
+          _horasIndividualesControllers[t.ktrabajador]!.text = _horasGlobalController.text;
+        } else {
+          _horasIndividualesControllers[t.ktrabajador]!.clear();
+        }
+      }
+    });
+  }
+
+  void _toggleTrabajador(String ktrabajador, bool valor) {
+    setState(() {
+      _checksTrabajadores[ktrabajador] = valor;
+      // Al marcar uno individualmente, hereda las horas de la cabecera
+      if (valor) {
+        _horasIndividualesControllers[ktrabajador]!.text = _horasGlobalController.text;
+      } else {
+        _horasIndividualesControllers[ktrabajador]!.clear();
       }
     });
   }
@@ -136,7 +150,6 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
     try {
       final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
       
-      // Obtenemos las jornadas existentes para evitar duplicados en el mismo día
       final jornadasExistentes = await _apiService.fetchList('tbljornada');
       final Set<String> trabajadoresConJornadaHoy = jornadasExistentes
           .where((j) => j['fecha_dtm'] != null && j['fecha_dtm'].toString().startsWith(fechaStr) && j['eliminado_bit'] == 0)
@@ -149,15 +162,18 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       for (var t in seleccionados) {
         if (trabajadoresConJornadaHoy.contains(t.ktrabajador)) {
           duplicados++;
-          continue; // Saltamos este trabajador si ya tiene jornada hoy
+          continue; 
         }
+
+        // Leemos las horas desde el controlador individual
+        final horasStr = _horasIndividualesControllers[t.ktrabajador]?.text.replaceAll(',', '.') ?? '';
 
         final data = {
           'kjornada': const Uuid().v4(),
           'ktrabajador': t.ktrabajador,
           'fecha_dtm': fechaStr,
           'horario_str': _horarioController.text.trim(),
-          'horas_flt': double.tryParse(_horasController.text.replaceAll(',', '.')),
+          'horas_flt': double.tryParse(horasStr),
           'observaciones_str': _obsControllers[t.ktrabajador]?.text.trim(),
           'eliminado_bit': 0,
         };
@@ -188,8 +204,11 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
   @override
   void dispose() {
     _horarioController.dispose();
-    _horasController.dispose();
+    _horasGlobalController.dispose();
     for (var ctrl in _obsControllers.values) {
+      ctrl.dispose();
+    }
+    for (var ctrl in _horasIndividualesControllers.values) {
       ctrl.dispose();
     }
     super.dispose();
@@ -207,7 +226,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       appBar: AppBar(title: const Text('Añadir Jornada')),
       body: Column(
         children: [
-          // CABECERA: Fecha, Horario y Horas
+          // --- CABECERA ---
           Container(
             padding: const EdgeInsets.all(16),
             color: theme.colorScheme.surface,
@@ -226,10 +245,6 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                       children: [
                         Icon(Icons.calendar_month, color: theme.primaryColor),
                         const SizedBox(width: 10),
-                        // Text(
-                        //   DateFormat('EEEE, d MMMM yyyy', 'es_ES').format(_fechaSeleccionada).toUpperCase(),
-                        //   style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor),
-                        // ),
                         Text(
                           DateFormat('yyyy-MM-dd').format(_fechaSeleccionada),
                           style: TextStyle(fontWeight: FontWeight.bold, color: theme.primaryColor),
@@ -242,7 +257,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                 Row(
                   children: [
                     Expanded(
-                      flex: 2,
+                      flex: 5,
                       child: TextField(
                         controller: _horarioController,
                         decoration: const InputDecoration(
@@ -254,12 +269,12 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      flex: 1,
+                      flex: 2,
                       child: TextField(
-                        controller: _horasController,
+                        controller: _horasGlobalController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: const InputDecoration(
-                          labelText: 'Horas (ej. 8)',
+                          labelText: 'Horas',
                           isDense: true,
                           border: OutlineInputBorder(),
                         ),
@@ -272,17 +287,18 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
           ),
           const Divider(height: 1),
 
-          // CHECKBOX MASIVO
+          // --- CHECKBOX MASIVO ---
           CheckboxListTile(
             title: const Text("Seleccionar todos los trabajadores"),
             value: _seleccionarTodos,
             activeColor: theme.primaryColor,
             onChanged: _toggleSeleccionarTodos,
             controlAffinity: ListTileControlAffinity.leading,
+            visualDensity: VisualDensity.compact,
           ),
           const Divider(height: 1),
 
-          // LISTA DE TRABAJADORES ACTIVOS ESE DÍA
+          // --- LISTA DE TRABAJADORES (COMPACTA Y EN LÍNEA) ---
           Expanded(
             child: _activosEnFecha.isEmpty
                 ? const Center(child: Text("No hay trabajadores activos en esta fecha"))
@@ -292,45 +308,66 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                       final t = _activosEnFecha[index];
                       final bool seleccionado = _checksTrabajadores[t.ktrabajador] ?? false;
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        elevation: seleccionado ? 2 : 0,
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(color: seleccionado ? theme.primaryColor : Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                          color: seleccionado ? theme.primaryColor.withOpacity(0.05) : Colors.transparent,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Column(
-                            children: [
-                              CheckboxListTile(
-                                value: seleccionado,
-                                activeColor: theme.primaryColor,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                title: Text(t.nombreStr, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(t.dniStr ?? 'Sin DNI'),
-                                visualDensity: const VisualDensity(vertical: -4),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _checksTrabajadores[t.ktrabajador] = val ?? false;
-                                  });
-                                },
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              visualDensity: VisualDensity.compact,
+                              activeColor: theme.primaryColor,
+                              value: seleccionado,
+                              onChanged: (val) => _toggleTrabajador(t.ktrabajador, val ?? false),
+                            ),
+                            
+                            // NOMBRE DEL TRABAJADOR
+                            Expanded(
+                              flex: 4,
+                              child: Text(
+                                t.nombreStr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                               ),
-                              if (seleccionado)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 56.0, right: 16.0, bottom: 8.0),
-                                  child: TextField(
-                                    controller: _obsControllers[t.ktrabajador],
-                                    decoration: InputDecoration(
-                                      labelText: 'Observaciones (opcional)',
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
+                            ),
+                            
+                            // HORAS Y OBSERVACIONES (Solo visibles si está seleccionado)
+                            if (seleccionado) ...[
+                              const SizedBox(width: 4),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: _horasIndividualesControllers[t.ktrabajador],
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: const InputDecoration(
+                                    hintText: 'H.',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                    border: OutlineInputBorder(),
                                   ),
                                 ),
-                            ],
-                          ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                flex: 5,
+                                child: TextField(
+                                  controller: _obsControllers[t.ktrabajador],
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Obs.',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ]
+                          ],
                         ),
                       );
                     },
@@ -340,7 +377,9 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: theme.primaryColor,
-        icon: _guardando ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save, color: Colors.white),
+        icon: _guardando 
+          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+          : const Icon(Icons.save, color: Colors.white),
         label: Text(_guardando ? 'Guardando...' : 'Guardar Jornadas', style: const TextStyle(color: Colors.white)),
         onPressed: _guardando ? null : _guardarJornadas,
       ),
