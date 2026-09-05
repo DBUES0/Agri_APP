@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/record_trabajador.dart';
 import '../utils/app_palette.dart';
+import 'page_trabajador_add.dart';
 
 class PageTrabajadorPerfil extends StatelessWidget {
   final Trabajador trabajador;
@@ -48,10 +49,36 @@ class PageTrabajadorPerfil extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(trabajador.nombreStr, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Chip(
-              label: Text(esActivo ? 'Contrato Activo' : 'Inactivo / Baja', style: const TextStyle(color: Colors.white)),
-              backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey,
+            // Sustituye el Chip solitario por este Row:
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Chip(
+                  label: Text(esActivo ? 'Contrato Activo' : 'Inactivo / Baja', style: const TextStyle(color: Colors.white)),
+                  backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AgriPalette.greenMain),
+                  onPressed: () async {
+                    final editado = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => PageTrabajadorForm(trabajador: trabajador)),
+                    );
+                    // Si el formulario guardó cambios, cerramos la pantalla de perfil 
+                    // devolviendo 'true' para que la lista principal se actualice automáticamente.
+                    if (editado == true) {
+                      if (!context.mounted) return;
+                      Navigator.pop(context, true); 
+                    }
+                  },
+                ),
+              ],
             ),
+            // Chip(
+            //   label: Text(esActivo ? 'Contrato Activo' : 'Inactivo / Baja', style: const TextStyle(color: Colors.white)),
+            //   backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey,
+            // ),
             const SizedBox(height: 30),
             Card(
               elevation: 2,

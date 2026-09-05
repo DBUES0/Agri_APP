@@ -18,13 +18,14 @@ if exist "apks" rd /s /q "apks"
 mkdir "apks"
 
 :: Compilamos la version final para el movil
-call flutter build apk --release --split-per-abi
+::call flutter build apk --release --split-per-abi
+call flutter build apk --release --target-platform android-arm64 --split-per-abi
 
 echo.
 echo [2/5] Seleccionando APKs de Release...
-copy "build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk" "apks\" /Y
+::copy "build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk" "apks\" /Y
 copy "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" "apks\" /Y
-copy "build\app\outputs\flutter-apk\app-x86_64-release.apk" "apks\" /Y
+::copy "build\app\outputs\flutter-apk\app-x86_64-release.apk" "apks\" /Y
 
 echo.
 echo [3/5] Haciendo Commit de App y API...

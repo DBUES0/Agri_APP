@@ -23,6 +23,7 @@ import '../models/record_albaran.dart';
 import '../models/record_movimientovisual.dart';
 import '../pages/page_albaran.dart';
 import '../pages/page_trabajador.dart';
+import '../pages/page_jornada_add.dart';
 
 
 /// [DashboardPage] es la pantalla principal tras el login.
@@ -586,7 +587,15 @@ Widget build(BuildContext context) {
                   icon: const Icon(Icons.add),
                   color: AgriPalette.greenMain,
                   tooltip: 'Añadir Jornada',
-                  onPressed: () { /* Navegar a PageJornada */ },
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        // 'widget.trabajador' asume que en tu Dashboard tienes esa lista disponible
+                        builder: (context) => PageJornadaAdd(trabajadores: widget.trabajador),
+                      ),
+                    );
+                  },
                 ),
               ],
               child: const Padding(

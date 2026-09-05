@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/record_trabajador.dart';
 import '../services/api_service.dart';
 import '../utils/app_palette.dart';
+import 'package:agriapp/utils/app_theme.dart';
 import '../utils/ui_utils.dart'; // Para mensajeEmergente
 import 'page_trabajador_add.dart';
 import 'page_trabajador_perfil.dart'; // <--- Nueva página que crearemos
@@ -43,6 +44,36 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
       print("Error cargando trabajadores: $e");
     } finally {
       if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+// --- NUEVO: Dar de baja en una fecha específica ---
+  Future<void> _bajaConFecha(Trabajador t) async {
+    final DateTime? fechaSeleccionada = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      // No dejamos que se den de baja antes de su fecha de alta
+      firstDate: t.fechainicioultimocontratoDtm ?? DateTime(2000), 
+      lastDate: DateTime(2101),
+      builder: (context, child) {
+        // Obligamos al calendario a heredar el tema de la aplicación
+        return Theme(data: Theme.of(context), child: child!);
+      },
+    );
+
+    if (fechaSeleccionada != null) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(fechaSeleccionada);
+      try {
+        await _apiService.putGeneric('tbltrabajador', t.ktrabajador, {
+          'fechafinultimocontrato_dtm': dateStr
+        });
+        if (!mounted) return;
+        mensajeEmergente(context, 'Trabajador dado de BAJA el $dateStr', tipo: 'warning');
+        _cargarTrabajadores();
+      } catch (e) {
+        if (!mounted) return;
+        mensajeEmergente(context, 'Error al cambiar estado: $e', tipo: 'error');
+      }
     }
   }
 
@@ -121,9 +152,9 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AgriPalette.greenMain),
             onPressed: () => Navigator.pop(context, true), 
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))
+            child: const Text('Eliminar', style: TextStyle(color: AgriPalette.greyMain)),
           ),
         ],
       ),
@@ -146,25 +177,28 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
     super.dispose();
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
+    // 1. Extraemos el tema global de la app
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text("Gestión de personal")),
       body: Column(
         children: [
-          // --- BARRA DE BÚSQUEDA Y CHECKBOX (MÁS COMPACTA) ---
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Menos padding vertical
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(
               children: [
                 Expanded(
                   child: SizedBox(
-                    height: 45, // Forzamos una altura más pequeña
+                    height: 45, 
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
+                        isDense: true,
                         labelText: 'Buscar por nombre...',
-                        prefixIcon: const Icon(Icons.search, color: AgriPalette.greenMain),
+                        prefixIcon: Icon(Icons.search, color: theme.primaryColor), // Usamos el color del tema
                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
@@ -189,8 +223,8 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
                     children: [
                       Checkbox(
                         value: _mostrarSoloActivos,
-                        activeColor: AgriPalette.greenMain,
-                        visualDensity: VisualDensity.compact, // Checkbox más pequeño
+                        activeColor: theme.primaryColor, // Usamos el color del tema
+                        visualDensity: VisualDensity.compact, 
                         onChanged: (valor) {
                           setState(() {
                             _mostrarSoloActivos = valor ?? true;
@@ -198,7 +232,7 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
                           });
                         },
                       ),
-                      const Text("Activos", style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text("Activos", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -207,7 +241,6 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
           ),
           const Divider(height: 1),
           
-          // --- LISTA DE TRABAJADORES ---
           Expanded(
             child: _cargando 
               ? const Center(child: CircularProgressIndicator())
@@ -220,64 +253,66 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
                         final bool esActivo = _calcularSiEsActivo(t);
 
                         return ListTile(
+                          // --- MÁXIMA COMPRESIÓN DE ALTURA ---
+                          dense: true, 
+                          visualDensity: const VisualDensity(vertical: -4), // Exprime el alto al máximo
+                          minVerticalPadding: 0, // Quita el padding vertical extra
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
+                          
                           leading: CircleAvatar(
-                            backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
-                            child: const Icon(Icons.person, color: Colors.white),
+                            radius: 18, // Ligeramente más pequeño para que no ensanche la fila
+                            backgroundColor: esActivo ? theme.primaryColor : theme.disabledColor,
+                            child: const Icon(Icons.person, color: Colors.white, size: 20),
                           ),
                           title: Text(
                             t.nombreStr, 
-                            style: TextStyle(
+                            style: theme.textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               decoration: esActivo ? null : TextDecoration.lineThrough,
-                              color: esActivo ? Colors.black87 : Colors.grey.shade600,
+                              color: esActivo ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
                             ),
                           ),
-                          subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
+                          subtitle: Text(
+                            t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI",
+                            style: theme.textTheme.bodySmall,
+                          ),
                           
-                          // CLICK NORMAL: Ver Perfil
-                          onTap: () {
-                            Navigator.push(
+                          onTap: () async {
+                            final editado = await Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
                             );
+                            if (editado == true) _cargarTrabajadores();
                           },
 
-                          // CLICK EN TRES PUNTITOS: Acciones
-                          trailing: PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: AgriPalette.greyMain),
-                            onSelected: (String result) async {
-                              if (result == 'editar') {
-                                final res = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => PageTrabajadorForm(trabajador: t)),
-                                );
-                                if (res == true) _cargarTrabajadores();
-                              } else if (result == 'alta') {
-                                _cambiarEstadoContrato(t, true);
-                              } else if (result == 'baja') {
-                                _cambiarEstadoContrato(t, false);
-                              } else if (result == 'eliminar') {
-                                _eliminarTrabajador(t);
-                              }
-                            },
-                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'editar',
-                                child: ListTile(leading: Icon(Icons.edit, color: AgriPalette.greenMain), title: Text('Editar'), contentPadding: EdgeInsets.zero, dense: true),
+                          // --- BOTONES DE ACCIÓN ---
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(esActivo ? Icons.person_remove : Icons.person_add, color: theme.primaryColor),
+                                padding: EdgeInsets.zero, // Quita el marco transparente del botón
+                                constraints: const BoxConstraints(), // Evita que el botón ensanche la fila
+                                onPressed: () => _cambiarEstadoContrato(t, !esActivo),
                               ),
-                              if (!esActivo)
-                                const PopupMenuItem<String>(
-                                  value: 'alta',
-                                  child: ListTile(leading: Icon(Icons.person_add, color: Colors.blue), title: Text('Dar de Alta'), contentPadding: EdgeInsets.zero, dense: true),
+                              
+                              // BOTÓN MÁGICO CON FECHA (Solo si está activo)
+                              if (esActivo) ...[
+                                const SizedBox(width: 12),
+                                IconButton(
+                                  icon: Icon(Icons.edit_calendar, color: theme.primaryColor),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _bajaConFecha(t), // Llama a la nueva función
                                 ),
-                              if (esActivo)
-                                const PopupMenuItem<String>(
-                                  value: 'baja',
-                                  child: ListTile(leading: Icon(Icons.person_remove, color: Colors.orange), title: Text('Dar de Baja'), contentPadding: EdgeInsets.zero, dense: true),
-                                ),
-                              const PopupMenuItem<String>(
-                                value: 'eliminar',
-                                child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Eliminar', style: TextStyle(color: Colors.red)), contentPadding: EdgeInsets.zero, dense: true),
+                              ],
+                              
+                              const SizedBox(width: 12),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: theme.primaryColor),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _eliminarTrabajador(t),
                               ),
                             ],
                           ),
@@ -288,7 +323,7 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AgriPalette.greenMain,
+        backgroundColor: theme.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
         onPressed: () async {
           final result = await Navigator.push(
@@ -303,6 +338,209 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
     );
   }
 }
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(title: const Text("Gestión de personal")),
+//       body: Column(
+//         children: [
+//           // --- BARRA DE BÚSQUEDA Y CHECKBOX (MÁS COMPACTA) ---
+//           Padding(
+//             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Menos padding vertical
+//             child: Row(
+//               children: [
+//                 Expanded(
+//                   child: SizedBox(
+//                     height: 45, // Forzamos una altura más pequeña
+//                     child: TextField(
+//                       controller: _searchController,
+//                       decoration: InputDecoration(
+//                         isDense: true, // Hace que el TextField sea más compacto
+//                         labelText: 'Buscar por nombre...',
+//                         prefixIcon: const Icon(Icons.search, color: AgriPalette.greenMain),
+//                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+//                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+//                       ),
+//                       onChanged: (valor) {
+//                         _busqueda = valor;
+//                         _filtrarYOrdenar(); 
+//                       },
+//                     ),
+//                   ),
+//                 ),
+//                 const SizedBox(width: 8),
+//                 InkWell(
+//                   onTap: () {
+//                     setState(() {
+//                       _mostrarSoloActivos = !_mostrarSoloActivos;
+//                       _filtrarYOrdenar();
+//                     });
+//                   },
+//                   borderRadius: BorderRadius.circular(8),
+//                   child: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       Checkbox(
+//                         value: _mostrarSoloActivos,
+//                         activeColor: AgriPalette.greenMain,
+//                         visualDensity: VisualDensity.compact, // Checkbox más pequeño
+//                         onChanged: (valor) {
+//                           setState(() {
+//                             _mostrarSoloActivos = valor ?? true;
+//                             _filtrarYOrdenar();
+//                           });
+//                         },
+//                       ),
+//                       const Text("Activos", style: TextStyle(fontWeight: FontWeight.bold)),
+//                     ],
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//           const Divider(height: 1),
+          
+//           // --- LISTA DE TRABAJADORES ---
+//           Expanded(
+//             child: _cargando 
+//               ? const Center(child: CircularProgressIndicator())
+//               : _trabajadoresFiltrados.isEmpty
+//                   ? const Center(child: Text("No se encontraron trabajadores"))
+//                   : ListView.builder(
+//                       itemCount: _trabajadoresFiltrados.length,
+//                       itemBuilder: (context, index) {
+//                         final t = _trabajadoresFiltrados[index];
+//                         final bool esActivo = _calcularSiEsActivo(t);
+
+//                         // return ListTile(
+//                         //   leading: CircleAvatar(
+//                         //     backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
+//                         //     child: const Icon(Icons.person, color: Colors.white),
+//                         //   ),
+//                         //   title: Text(
+//                         //     t.nombreStr, 
+//                         //     style: TextStyle(
+//                         //       fontWeight: FontWeight.bold,
+//                         //       decoration: esActivo ? null : TextDecoration.lineThrough,
+//                         //       color: esActivo ? Colors.black87 : Colors.grey.shade600,
+//                         //     ),
+//                         //   ),
+//                         //   subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
+                          
+//                         //   // CLICK NORMAL: Ver Perfil
+//                         //   onTap: () {
+//                         //     Navigator.push(
+//                         //       context,
+//                         //       MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
+//                         //     );
+//                         //   },
+
+//                         //   // CLICK EN TRES PUNTITOS: Acciones
+//                         //   trailing: PopupMenuButton<String>(
+//                         //     icon: const Icon(Icons.more_vert, color: AgriPalette.greyMain),
+//                         //     onSelected: (String result) async {
+//                         //       if (result == 'editar') {
+//                         //         final res = await Navigator.push(
+//                         //           context,
+//                         //           MaterialPageRoute(builder: (context) => PageTrabajadorForm(trabajador: t)),
+//                         //         );
+//                         //         if (res == true) _cargarTrabajadores();
+//                         //       } else if (result == 'alta') {
+//                         //         _cambiarEstadoContrato(t, true);
+//                         //       } else if (result == 'baja') {
+//                         //         _cambiarEstadoContrato(t, false);
+//                         //       } else if (result == 'eliminar') {
+//                         //         _eliminarTrabajador(t);
+//                         //       }
+//                         //     },
+//                         //     itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+//                         //       const PopupMenuItem<String>(
+//                         //         value: 'editar',
+//                         //         child: ListTile(leading: Icon(Icons.edit, color: AgriPalette.greenMain), title: Text('Editar'), contentPadding: EdgeInsets.zero, dense: true),
+//                         //       ),
+//                         //       if (!esActivo)
+//                         //         const PopupMenuItem<String>(
+//                         //           value: 'alta',
+//                         //           child: ListTile(leading: Icon(Icons.person_add, color: Colors.blue), title: Text('Dar de Alta'), contentPadding: EdgeInsets.zero, dense: true),
+//                         //         ),
+//                         //       if (esActivo)
+//                         //         const PopupMenuItem<String>(
+//                         //           value: 'baja',
+//                         //           child: ListTile(leading: Icon(Icons.person_remove, color: Colors.orange), title: Text('Dar de Baja'), contentPadding: EdgeInsets.zero, dense: true),
+//                         //         ),
+//                         //       const PopupMenuItem<String>(
+//                         //         value: 'eliminar',
+//                         //         child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Eliminar', style: TextStyle(color: Colors.red)), contentPadding: EdgeInsets.zero, dense: true),
+//                         //       ),
+//                         //     ],
+//                         //   ),
+//                         // );
+//                       return ListTile(
+//                         dense: true, // <--- Compacta el interlineado
+//                         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0), // <--- Reduce la altura de la fila
+//                         leading: CircleAvatar(
+//                           backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
+//                           child: const Icon(Icons.person, color: Colors.white),
+//                         ),
+//                         title: Text(
+//                           t.nombreStr, 
+//                           style: TextStyle(
+//                             fontWeight: FontWeight.bold,
+//                             decoration: esActivo ? null : TextDecoration.lineThrough,
+//                             color: esActivo ? Colors.black87 : Colors.grey.shade600,
+//                           ),
+//                         ),
+//                         subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
+                        
+//                         // 1. ESPERAR RESULTADO DEL PERFIL
+//                         onTap: () async {
+//                           final editado = await Navigator.push(
+//                             context,
+//                             MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
+//                           );
+//                           // Si se editó en el perfil, refrescamos la lista
+//                           if (editado == true) _cargarTrabajadores();
+//                         },
+
+//                         // 2. SUSTITUIR EL POPUPMENU POR ICONOS DIRECTOS VERDES
+//                         trailing: Row(
+//                           mainAxisSize: MainAxisSize.min,
+//                           children: [
+//                             IconButton(
+//                               icon: Icon(
+//                                 esActivo ? Icons.person_remove : Icons.person_add, 
+//                                 color: AgriPalette.greenMain, // Siempre verde
+//                               ),
+//                               onPressed: () => _cambiarEstadoContrato(t, !esActivo),
+//                             ),
+//                             IconButton(
+//                               icon: const Icon(Icons.delete, color: AgriPalette.greenMain), // Siempre verde
+//                               onPressed: () => _eliminarTrabajador(t),
+//                             ),
+//                           ],
+//                         ),
+//                       );
+//                       },
+//                     ),
+//           ),
+//         ],
+//       ),
+//       floatingActionButton: FloatingActionButton(
+//         backgroundColor: AgriPalette.greenMain,
+//         child: const Icon(Icons.add, color: Colors.white),
+//         onPressed: () async {
+//           final result = await Navigator.push(
+//             context,
+//             MaterialPageRoute(builder: (context) => const PageTrabajadorForm()),
+//           );
+//           if (result == true) {
+//             _cargarTrabajadores(); 
+//           }
+//         },
+//       ),
+//     );
+//   }
+// }
 
 
 // import 'package:flutter/material.dart';
