@@ -1,8 +1,13 @@
 // lib/pages/page_login.dart
+import 'package:flutter/gestures.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // <-- Soluciona Error 3
+import 'package:http/http.dart' as http; // <-- Para llamar a la API directamente
 
 import '../services/api_service.dart';
 import '../services/db_service.dart';
@@ -20,7 +25,6 @@ import '../utils/app_theme.dart';
 
 // Importamos el Dashboard directamente
 import 'page_dashboard.dart';
-
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -44,15 +48,111 @@ class _LoginPageState extends State<LoginPage> {
     super.initState();
     _cargarInfoApp();
   }
-
-  // Descarga el texto dinámico al arrancar la pantalla
-  Future<void> _cargarInfoApp() async {
-    final info = await _apiService.getAppInfo();
-    if (info != null && mounted) {
-      setState(() {
-        _mensajeInfo = info;
-      });
+Future<void> _abrirUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  // Convierte el formato [Texto](url) en un hipervínculo clickeable ocultando la URL
+  Widget _buildTextoConEnlace(String texto) {
+    final RegExp exp = RegExp(r'\[([^\]]+)\]\(([^)]+)\)');
+    final Iterable<RegExpMatch> matches = exp.allMatches(texto);
+
+    if (matches.isEmpty) {
+      return Text(texto, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 13));
+    }
+
+    List<TextSpan> spans = [];
+    int lastMatchEnd = 0;
+
+    for (var match in matches) {
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(text: texto.substring(lastMatchEnd, match.start)));
+      }
+      
+      String linkText = match.group(1)!;
+      String linkUrl = match.group(2)!;
+
+      spans.add(TextSpan(
+        text: linkText,
+        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+        recognizer: TapGestureRecognizer()..onTap = () => _abrirUrl(linkUrl),
+      ));
+
+      lastMatchEnd = match.end;
+    }
+
+    if (lastMatchEnd < texto.length) {
+      spans.add(TextSpan(text: texto.substring(lastMatchEnd)));
+    }
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(style: const TextStyle(color: Colors.grey, fontSize: 13), children: spans),
+    );
+  }
+
+  // --- NUEVA FUNCIÓN CORREGIDA ---
+  Future<void> _cargarInfoApp() async {
+    try {
+      // Usamos http directamente para recibir el JSON completo y no pelear con getAppInfo()
+      final response = await http.get(Uri.parse('https://api.bueso.duckdns.org/api/info'));
+      
+      if (response.statusCode == 200) {
+        // Transformamos la respuesta en un diccionario
+        final Map<String, dynamic> data = jsonDecode(response.body);
+
+        if (mounted) {
+          setState(() {
+            _mensajeInfo = data['mensaje']?.toString();
+          });
+        }
+
+        // Comprobar la versión
+        final packageInfo = await PackageInfo.fromPlatform();
+        final versionInstalada = packageInfo.version; 
+        final versionServidor = data['version_ultima']?.toString();
+        final urlApk = data['url_apk']?.toString();
+
+        if (versionServidor != null && versionInstalada != versionServidor && urlApk != null) {
+          if (mounted) {
+            _mostrarAlertaActualizacion(versionInstalada, versionServidor, urlApk);
+          }
+        }
+      }
+    } catch (e) {
+      print("Error cargando info de la app: $e");
+    }
+  }
+
+  // --- CUADRO DE DIÁLOGO ---
+  void _mostrarAlertaActualizacion(String versionInstalada, String versionServidor, String urlApk) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Obliga al usuario a elegir
+      builder: (context) => AlertDialog(
+        title: const Text('Actualización disponible'),
+        content: Text('Tienes la versión $versionInstalada y la nueva versión $versionServidor está lista para descargar.\n\n¿Deseas actualizar ahora?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Más tarde', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              final Uri url = Uri.parse(urlApk);
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication); 
+              }
+            },
+            child: const Text('Actualizar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _login() async {
@@ -219,21 +319,31 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
 
-            const Spacer(flex: 6), 
+            const Spacer(flex: 2), 
             
             // --- TEXTO DINÁMICO DEL SERVIDOR ---
+// --- TEXTO DINÁMICO DEL SERVIDOR ---
             if (_mensajeInfo != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Text(
-                  _mensajeInfo!,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey.shade600,
-                    height: 1.4, // Interlineado para facilitar lectura de varias líneas
-                  ),
-                ),
+                padding: const EdgeInsets.only(bottom: 20.0), // Separación con el borde inferior
+                child: _buildTextoConEnlace(_mensajeInfo!),
               ),
+              // Padding(
+              //   padding: const EdgeInsets.only(bottom: 2.0),
+              //   child: Linkify(
+              //     onOpen: (link) async {
+              //       final Uri url = Uri.parse(link.url);
+              //       if (await canLaunchUrl(url)) {
+              //         await launchUrl(url, mode: LaunchMode.externalApplication);
+              //       }
+              //     },
+              //     // AÑADE ?? '' AQUÍ:
+              //     text: _mensajeInfo ?? '', 
+              //     textAlign: TextAlign.center,
+              //     style: const TextStyle(color: Colors.grey, fontSize: 12),
+              //     linkStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              //   )
+              // ),
           ],
         ),
       ),

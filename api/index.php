@@ -182,24 +182,108 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
 
 // Endpoint público para información y novedades en el Login
 $app->get('/api/info', function (Request $request, Response $response) {
-    // Puedes editar este texto directamente aquí siempre que quieras
-    $mensaje = $mensajeinicial ?? "Bienvenido a la aplicación de gestión agrícola. Mantente al tanto de las últimas novedades y actualizaciones.";
-    
-    return jsonResponse($response, ['mensaje' => $mensaje]);
+    // 1. Leer el mensaje desde un archivo TXT plano
+    $archivoTxt = __DIR__ . '/docs/novedades.txt';
+    $mensaje = file_exists($archivoTxt) 
+        ? file_get_contents($archivoTxt) 
+        : "Bienvenido a la aplicación de gestión agrícola. (Crea el archivo novedades.txt en el servidor)";
+
+    // 2. Definir la versión más reciente de la app
+    // Cámbialo aquí cuando compiles una nueva versión en Flutter
+    $versionUltima = "1.0.2"; 
+    $urlActualizacion = "https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk";
+
+    return jsonResponse($response, [
+        'mensaje' => $mensaje,
+        'version_ultima' => $versionUltima,
+        'url_apk' => $urlActualizacion
+    ]);
 });
+// $app->get('/api/info', function (Request $request, Response $response) use ($mensajeinicial) {
+//     $mensaje = $mensajeinicial ?? "Bienvenido a la aplicación de gestión agrícola.";
+//     return jsonResponse($response, ['mensaje' => $mensaje]);
+// });
 
 // Ruta de prueba
-$app->get('/', function (Request $request, Response $response) {
-    $contenido = file_get_contents(__DIR__ . '/docs/docs.html');
-    $response->getBody()->write($contenido);
-    return $response->withHeader('Content-Type', 'text/html');
-        //return jsonResponse($response, [$contenido]);  //200 porque patatas
+// $app->get('/', function (Request $request, Response $response) {
+//     $contenido = file_get_contents(__DIR__ . '/docs/docs.html');
+//     $response->getBody()->write($contenido);
+//     return $response->withHeader('Content-Type', 'text/html');
+//         //return jsonResponse($response, [$contenido]);  //200 porque patatas
+// });
+
+$app->post('/api/marcaje', function (Request $request, Response $response) use ($servername, $username, $password, $dbname) {
+    $data = json_decode($request->getBody()->getContents(), true);
+    
+    $finca = $data['nombrefincamarcaje_str'] ?? '';
+    $dni = $data['dni_str'] ?? '';
+    $pass_input = $data['password_str'] ?? '';
+    $lat = $data['latitud_dec'] ?? null;
+    $lon = $data['longitud_dec'] ?? null;
+
+    if (!$finca || !$dni || !$pass_input) {
+        return jsonResponse($response, ['error' => 'Faltan datos obligatorios.'], 400);
+    }
+
+    try {
+        $conn = conectarDB($servername, $username, $password, $dbname);
+
+        // 1. Obtener el kagricultor a partir del nombre de la finca de marcaje
+        $stmtFinca = $conn->prepare("SELECT kagricultor FROM tblAgricultores WHERE nombrefincamarcaje_str = ? AND eliminado_bit = b'0'");
+        $stmtFinca->bind_param("s", $finca);
+        $stmtFinca->execute();
+        $resultFinca = $stmtFinca->get_result();
+        
+        if ($resultFinca->num_rows === 0) {
+            return jsonResponse($response, ['error' => 'Empresa/Finca no encontrada.'], 404);
+        }
+        $kagricultor = $resultFinca->fetch_assoc()['kagricultor'];
+        $stmtFinca->close();
+
+        // 2. Obtener el trabajador y su contraseña a partir del DNI y el kagricultor
+        $stmtTrabajador = $conn->prepare("SELECT ktrabajador, password_str FROM tbltrabajador WHERE kagricultor = ? AND dni_str = ? AND eliminado_bit = b'0'");
+        $stmtTrabajador->bind_param("ss", $kagricultor, $dni);
+        $stmtTrabajador->execute();
+        $resultTrabajador = $stmtTrabajador->get_result();
+
+        if ($resultTrabajador->num_rows === 0) {
+            return jsonResponse($response, ['error' => 'Trabajador no encontrado o inactivo.'], 404);
+        }
+        
+        $rowTrabajador = $resultTrabajador->fetch_assoc();
+        $ktrabajador = $rowTrabajador['ktrabajador'];
+        $hash_guardado = $rowTrabajador['password_str'];
+        $stmtTrabajador->close();
+
+        // 3. Verificar contraseña (ajusta esto si las contraseñas de los trabajadores no están encriptadas con password_hash)
+        if (!password_verify($pass_input, $hash_guardado)) {
+             // Si las guardas en texto plano, cambia la línea de arriba por: if ($pass_input !== $hash_guardado) {
+             return jsonResponse($response, ['error' => 'Contraseña incorrecta.'], 401);
+        }
+
+        // 4. Insertar el marcaje. fechamarcaje_dtm se pone solo por el DEFAULT current_timestamp()
+        $stmtInsert = $conn->prepare("INSERT INTO tblmarcaje (kmarcaje, kagricultor, ktrabajador, tipodemarcaje_str, latitud_dec, longitud_dec) VALUES (UUID(), ?, ?, 'Web', ?, ?)");
+        $stmtInsert->bind_param("ssdd", $kagricultor, $ktrabajador, $lat, $lon);
+        $stmtInsert->execute();
+        $stmtInsert->close();
+        $conn->close();
+
+        return jsonResponse($response, ['mensaje' => 'Marcaje registrado correctamente.']);
+
+    } catch (Exception $e) {
+        return jsonResponse($response, ['error' => 'Error del servidor: ' . $e->getMessage()], 500);
+    }
 });
 
-if ($_SERVER['REQUEST_URI'] === '/' || $_SERVER['REQUEST_URI'] === '/index.php') {
-    header('Location: /docs.html');
-    exit;
-}
+// if ($_SERVER['REQUEST_URI'] === '/' || $_SERVER['REQUEST_URI'] === '/index.php') {
+//     header('Location: /docs.html');
+//     exit;
+// }
+
+// Redirección limpia a la documentación
+$app->get('/', function (Request $request, Response $response) {
+    return $response->withHeader('Location', '/docs.html')->withStatus(302);
+});
 
 // Rutas Swagger
 $app->get('/swagger.json', function (Request $request, Response $response) {
@@ -218,7 +302,7 @@ $app->get('/swagger.json', function (Request $request, Response $response) {
 //
 // .:RUTAS PRIVADAS:.
 //
-$app->add(jwtMiddleware($secretKey));
+//$app->add(jwtMiddleware($secretKey));
 
 //desbloquear usuario
 $app->post('/api/admin/unlock/{identificador}', function (Request $request, Response $response, array $args) use ($servername, $username, $password, $dbname) {

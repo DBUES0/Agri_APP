@@ -233,15 +233,68 @@ paths:
 
   /api/info:
     get:
-      tags: [public]
+      tags: [Genéricas]
       summary: Acceso a la información actualizada de la aplicación y novedades
+      description: Endpoint público que devuelve información dinámica para mostrar en la pantalla de inicio de sesión de la App.
       responses:
         '200':
-          description: Información actualizada de la aplicación y novedades
+          description: OK
           content:
             application/json:
               schema:
-                type: string
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Novedades AgriAPP v1.2..."
+
+  /api/marcaje:
+    post:
+      tags: [Trabajadores]
+      summary: Registrar marcaje de entrada/salida
+      description: Permite registrar un marcaje proporcionando la finca de destino, DNI del trabajador, clave y coordenadas opcionales.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombrefincamarcaje_str:
+                  type: string
+                  example: "Finca Los Olivos"
+                dni_str:
+                  type: string
+                  example: "12345678X"
+                password_str:
+                  type: string
+                  example: "secreta123"
+                latitud_dec:
+                  type: number
+                  example: 37.389092
+                longitud_dec:
+                  type: number
+                  example: -5.984458
+              required: [nombrefincamarcaje_str, dni_str, password_str]
+      responses:
+        '200':
+          description: Marcaje registrado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                    example: "Marcaje registrado correctamente."
+        '400':
+          description: Faltan datos obligatorios
+        '401':
+          description: Contraseña incorrecta
+        '404':
+          description: Empresa o trabajador no encontrados
+        '500':
+          description: Error del servidor
 
   /swagger.json:
     get:

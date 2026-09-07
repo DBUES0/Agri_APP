@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fichar - AgriAPP</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 40px;
+            color: #2E7D32; /* Tu AgriPalette.greenMain */
+            margin-bottom: 5px;
+        }
+        .title {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+            background-color: #f9f9f9;
+        }
+        .input-group input:not([readonly]):focus {
+            background-color: #fff;
+            border-color: #2E7D32;
+            outline: none;
+        }
+        .btn-submit {
+            background-color: #2E7D32;
+            color: white;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-submit:hover {
+            background-color: #1b5e20;
+        }
+        .btn-submit:disabled {
+            background-color: #9e9e9e;
+            cursor: not-allowed;
+        }
+        #mensaje {
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .success { color: #2E7D32; }
+        .error { color: #d32f2f; }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <div class="logo">🌿</div>
+    <div class="title">Registro de Jornada</div>
+
+    <form id="marcajeForm">
+        <div class="input-group">
+            <label>Finca</label>
+            <input type="text" id="finca" readonly>
+        </div>
+        <div class="input-group">
+            <label>DNI/NIE del Trabajador</label>
+            <input type="text" id="dni" readonly>
+        </div>
+        <div class="input-group">
+            <label>Contraseña</label>
+            <input type="password" id="password" placeholder="Introduce tu contraseña" required>
+        </div>
+
+        <button type="submit" id="btnFichar" class="btn-submit">FICHAR AHORA</button>
+        <div id="mensaje"></div>
+    </form>
+</div>
+
+<script>
+    // 1. Leer parámetros de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramFinca = urlParams.get('finca') || '';
+    const paramDni = urlParams.get('dni') || '';
+
+    // Rellenar cuadros de texto bloqueados
+    document.getElementById('finca').value = paramFinca;
+    document.getElementById('dni').value = paramDni;
+
+    const form = document.getElementById('marcajeForm');
+    const mensajeDiv = document.getElementById('mensaje');
+    const btnFichar = document.getElementById('btnFichar');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const pass = document.getElementById('password').value;
+        if (!paramFinca || !paramDni) {
+            mostrarMensaje('Faltan parámetros en el enlace original.', false);
+            return;
+        }
+
+        btnFichar.disabled = true;
+        btnFichar.innerText = 'Obteniendo ubicación...';
+
+        // 2. Obtener GPS (Nota: Solo funciona si la web tiene HTTPS)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => enviarDatos(position.coords.latitude, position.coords.longitude, pass),
+                (error) => enviarDatos(null, null, pass) // Enviamos igual si rechaza el GPS
+            );
+        } else {
+            enviarDatos(null, null, pass);
+        }
+    });
+
+    function enviarDatos(lat, lon, password) {
+        btnFichar.innerText = 'Registrando...';
+
+        const payload = {
+            nombrefincamarcaje_str: paramFinca,
+            dni_str: paramDni,
+            password_str: password,
+            latitud_dec: lat,
+            longitud_dec: lon
+        };
+
+        // 3. Enviar a tu API
+        fetch('https://api.bueso.duckdns.org/api/marcaje', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(res => {
+            if (res.status === 200) {
+                mostrarMensaje('¡Has fichado correctamente!', true);
+                document.getElementById('password').value = ''; // Limpiar contraseña
+            } else {
+                mostrarMensaje(res.body.error || 'Error desconocido.', false);
+            }
+        })
+        .catch(err => {
+            mostrarMensaje('Error de conexión con el servidor.', false);
+        })
+        .finally(() => {
+            btnFichar.disabled = false;
+            btnFichar.innerText = 'FICHAR AHORA';
+        });
+    }
+
+    function mostrarMensaje(texto, esExito) {
+        mensajeDiv.innerText = texto;
+        mensajeDiv.className = esExito ? 'success' : 'error';
+    }
+</script>
+
+</body>
+</html>

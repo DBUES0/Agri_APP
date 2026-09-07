@@ -21,6 +21,8 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   intl: ^0.19.0
+  flutter_linkify: ^6.0.0     # Para hacer los enlaces clickables
+  package_info_plus: ^8.0.0   # Para saber la versión instalada en el S23
   # shared_preferences ya la tienes
 
 # flutter_icons:
