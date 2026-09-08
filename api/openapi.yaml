@@ -102,7 +102,7 @@ paths:
                   example: davidbueso@gmail.com
                 password:
                   type: string
-                  example: 1234a*
+                  example: a*1234
               required: [email, password]
       responses:
         '200':

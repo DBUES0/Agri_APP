@@ -1,3 +1,1 @@
-Holi
-
-Enlace: [haz clic aquí](https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk)
+Holi, de [aquí](https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk) te descargas la aplicación

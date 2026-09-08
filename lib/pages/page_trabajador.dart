@@ -1,4 +1,9 @@
 // //lib/pages/page_trabajador.dart
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart'; // Mantén este para el plan B
+import 'dart:convert'; // Para que funcione jsonDecode
+import 'package:shared_preferences/shared_preferences.dart'; // Para leer los datos guardados
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/record_trabajador.dart';
@@ -32,6 +37,146 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
   void initState() {
     super.initState();
     _cargarTrabajadores();
+  }
+
+// --- 1. VENTANA EMERGENTE PARA DEFINIR CONTRASEÑA ---
+  Future<void> _cambiarPasswordTrabajador(Trabajador t) async {
+    final TextEditingController pass1Controller = TextEditingController();
+    final TextEditingController pass2Controller = TextEditingController();
+    final theme = Theme.of(context);
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Contraseña para ${t.nombreStr}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: pass1Controller,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Nueva contraseña', isDense: true),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pass2Controller,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Repetir contraseña', isDense: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor),
+            onPressed: () async {
+              if (pass1Controller.text.isEmpty || pass1Controller.text != pass2Controller.text) {
+                mensajeEmergente(context, 'Las contraseñas no coinciden o están vacías', tipo: 'error');
+                return;
+              }
+
+              try {
+                // Guardamos la contraseña en la tabla tbltrabajador
+                await _apiService.putGeneric('tbltrabajador', t.ktrabajador, {
+                  'password_str': pass1Controller.text.trim()
+                });
+                if (!mounted) return;
+                Navigator.pop(context);
+                mensajeEmergente(context, 'Contraseña guardada correctamente', tipo: 'success');
+              } catch (e) {
+                mensajeEmergente(context, 'Error al guardar contraseña: $e', tipo: 'error');
+              }
+            },
+            child: const Text('Guardar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 2. COMPARTIR ENLACE DE MARCAJE ---
+  Future<void> _compartirMarcaje(Trabajador t) async {
+    if (t.dniStr == null || t.dniStr!.isEmpty) {
+      mensajeEmergente(context, 'El trabajador no tiene DNI asignado', tipo: 'warning');
+      return;
+    }
+
+    try {
+      // Obtenemos los datos del agricultor logueado para sacar su 'nombrefincamarcaje_str'
+      // Asumimos que tienes guardado el usuario en SharedPreferences o puedes consultarlo
+      final prefs = await SharedPreferences.getInstance();
+      final usuarioJson = prefs.getString('usuario_json');
+      
+      if (usuarioJson == null) {
+        mensajeEmergente(context, 'No se encontró la información de la empresa', tipo: 'error');
+        return;
+      }
+
+      final usuarioData = jsonDecode(usuarioJson);
+      final String fincaMarcaje = usuarioData['nombrefincamarcaje_str'] ?? '';
+
+      if (fincaMarcaje.isEmpty) {
+        mensajeEmergente(context, 'La empresa no tiene configurada la finca de marcaje', tipo: 'error');
+        return;
+      }
+
+      // Construimos la URL personalizada
+      final String urlMarcaje = "${ApiService.dominioWeb}/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
+      
+      // Texto amigable para enviar por WhatsApp
+      final String mensaje = "Hola ${t.nombreStr}, haz clic en el siguiente enlace para registrar tu jornada:\n$urlMarcaje";
+
+      // Abrimos el menú nativo del móvil para compartir (WhatsApp, Email, etc.)
+      await Share.share(mensaje);
+
+    } catch (e) {
+      mensajeEmergente(context, 'Error al generar enlace: $e', tipo: 'error');
+    }
+  }
+
+Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
+    if (t.dniStr == null || t.dniStr!.isEmpty) {
+      mensajeEmergente(context, 'El trabajador no tiene DNI asignado', tipo: 'warning');
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final usuarioJson = prefs.getString('usuario_json');
+      
+      if (usuarioJson == null) {
+        mensajeEmergente(context, 'No se encontró la información de la empresa', tipo: 'error');
+        return;
+      }
+
+      final usuarioData = jsonDecode(usuarioJson);
+      final String fincaMarcaje = usuarioData['nombrefincamarcaje_str'] ?? '';
+
+      if (fincaMarcaje.isEmpty) {
+        mensajeEmergente(context, 'La empresa no tiene configurada la finca de marcaje', tipo: 'error');
+        return;
+      }
+
+      final String urlMarcaje = "${ApiService.dominioWeb}/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
+      final String mensaje = "Hola ${t.nombreStr}, haz clic en el siguiente enlace para registrar tu jornada:\n$urlMarcaje";
+
+      // 1. Preparamos el enlace nativo de WhatsApp
+      final Uri whatsappUrl = Uri.parse("whatsapp://send?text=${Uri.encodeComponent(mensaje)}");
+
+      // 2. Intentamos abrir WhatsApp
+      if (await canLaunchUrl(whatsappUrl)) {
+        await launchUrl(whatsappUrl);
+      } else {
+        // 3. Plan B: Si no tiene WhatsApp, abrimos el menú genérico
+        await Share.share(mensaje);
+      }
+
+    } catch (e) {
+      mensajeEmergente(context, 'Error al generar enlace: $e', tipo: 'error');
+    }
   }
 
   Future<void> _cargarTrabajadores() async {
@@ -154,7 +299,7 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AgriPalette.greenMain),
             onPressed: () => Navigator.pop(context, true), 
-            child: const Text('Eliminar', style: TextStyle(color: AgriPalette.greyMain)),
+            child: const Text('Eliminar', style: TextStyle(color: AgriPalette.white )),
           ),
         ],
       ),
@@ -187,7 +332,7 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
             child: Row(
               children: [
                 Expanded(
@@ -252,67 +397,77 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
                         final t = _trabajadoresFiltrados[index];
                         final bool esActivo = _calcularSiEsActivo(t);
 
-                        return ListTile(
-                          // --- MÁXIMA COMPRESIÓN DE ALTURA ---
-                          dense: true, 
-                          visualDensity: const VisualDensity(vertical: -4), // Exprime el alto al máximo
-                          minVerticalPadding: 0, // Quita el padding vertical extra
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0),
-                          
-                          leading: CircleAvatar(
-                            radius: 18, // Ligeramente más pequeño para que no ensanche la fila
-                            backgroundColor: esActivo ? theme.primaryColor : theme.disabledColor,
-                            child: const Icon(Icons.person, color: Colors.white, size: 20),
+                      return Container(
+                          decoration: BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                           ),
-                          title: Text(
-                            t.nombreStr, 
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              decoration: esActivo ? null : TextDecoration.lineThrough,
-                              color: esActivo ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
-                            ),
-                          ),
-                          subtitle: Text(
-                            t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI",
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          
-                          onTap: () async {
-                            final editado = await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
-                            );
-                            if (editado == true) _cargarTrabajadores();
-                          },
-
-                          // --- BOTONES DE ACCIÓN ---
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 5.0),
+                          child: Row(
                             children: [
-                              IconButton(
-                                icon: Icon(esActivo ? Icons.person_remove : Icons.person_add, color: theme.primaryColor),
-                                padding: EdgeInsets.zero, // Quita el marco transparente del botón
-                                constraints: const BoxConstraints(), // Evita que el botón ensanche la fila
-                                onPressed: () => _cambiarEstadoContrato(t, !esActivo),
+                              // Avatar
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: esActivo ? theme.primaryColor : theme.disabledColor,
+                                child: const Icon(Icons.person, color: AgriPalette.white, size: 18),
                               ),
+                              const SizedBox(width: 10),
                               
-                              // BOTÓN MÁGICO CON FECHA (Solo si está activo)
-                              if (esActivo) ...[
-                                const SizedBox(width: 12),
-                                IconButton(
-                                  icon: Icon(Icons.edit_calendar, color: theme.primaryColor),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => _bajaConFecha(t), // Llama a la nueva función
+                              // Texto (Nombre y DNI) - Se expande para empujar los botones a la derecha
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      t.nombreStr,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        decoration: esActivo ? null : TextDecoration.lineThrough,
+                                        color: esActivo ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
+                                      ),
+                                    ),
+                                    Text(
+                                      t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI",
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ],
                                 ),
-                              ],
-                              
-                              const SizedBox(width: 12),
-                              IconButton(
-                                icon: Icon(Icons.delete, color: theme.primaryColor),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                onPressed: () => _eliminarTrabajador(t),
+                              ),
+
+                              // Fila compacta de botones
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.lock),
+                                    color: AgriPalette.greenMain,
+                                    tooltip: 'Definir Contraseña',
+                                    onPressed: () => _cambiarPasswordTrabajador(t),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.share),
+                                    color: AgriPalette.greenMain,
+                                    tooltip: 'Compartir Marcaje',
+                                    onPressed: () => _compartirMarcajeWhatsApp(t),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(esActivo ? Icons.person_remove : Icons.person_add),
+                                    color: AgriPalette.greenMain,
+                                    onPressed: () => _cambiarEstadoContrato(t, !esActivo),
+                                  ),
+                                  if (esActivo)
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_calendar),
+                                      color: AgriPalette.greenMain,
+                                      onPressed: () => _bajaConFecha(t),
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete),
+                                    color: AgriPalette.greenMain,
+                                    onPressed: () => _eliminarTrabajador(t),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -324,7 +479,7 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: theme.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add, color: AgriPalette.white),
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -338,611 +493,3 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
     );
   }
 }
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Gestión de personal")),
-//       body: Column(
-//         children: [
-//           // --- BARRA DE BÚSQUEDA Y CHECKBOX (MÁS COMPACTA) ---
-//           Padding(
-//             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0), // Menos padding vertical
-//             child: Row(
-//               children: [
-//                 Expanded(
-//                   child: SizedBox(
-//                     height: 45, // Forzamos una altura más pequeña
-//                     child: TextField(
-//                       controller: _searchController,
-//                       decoration: InputDecoration(
-//                         isDense: true, // Hace que el TextField sea más compacto
-//                         labelText: 'Buscar por nombre...',
-//                         prefixIcon: const Icon(Icons.search, color: AgriPalette.greenMain),
-//                         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-//                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-//                       ),
-//                       onChanged: (valor) {
-//                         _busqueda = valor;
-//                         _filtrarYOrdenar(); 
-//                       },
-//                     ),
-//                   ),
-//                 ),
-//                 const SizedBox(width: 8),
-//                 InkWell(
-//                   onTap: () {
-//                     setState(() {
-//                       _mostrarSoloActivos = !_mostrarSoloActivos;
-//                       _filtrarYOrdenar();
-//                     });
-//                   },
-//                   borderRadius: BorderRadius.circular(8),
-//                   child: Row(
-//                     mainAxisSize: MainAxisSize.min,
-//                     children: [
-//                       Checkbox(
-//                         value: _mostrarSoloActivos,
-//                         activeColor: AgriPalette.greenMain,
-//                         visualDensity: VisualDensity.compact, // Checkbox más pequeño
-//                         onChanged: (valor) {
-//                           setState(() {
-//                             _mostrarSoloActivos = valor ?? true;
-//                             _filtrarYOrdenar();
-//                           });
-//                         },
-//                       ),
-//                       const Text("Activos", style: TextStyle(fontWeight: FontWeight.bold)),
-//                     ],
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           const Divider(height: 1),
-          
-//           // --- LISTA DE TRABAJADORES ---
-//           Expanded(
-//             child: _cargando 
-//               ? const Center(child: CircularProgressIndicator())
-//               : _trabajadoresFiltrados.isEmpty
-//                   ? const Center(child: Text("No se encontraron trabajadores"))
-//                   : ListView.builder(
-//                       itemCount: _trabajadoresFiltrados.length,
-//                       itemBuilder: (context, index) {
-//                         final t = _trabajadoresFiltrados[index];
-//                         final bool esActivo = _calcularSiEsActivo(t);
-
-//                         // return ListTile(
-//                         //   leading: CircleAvatar(
-//                         //     backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
-//                         //     child: const Icon(Icons.person, color: Colors.white),
-//                         //   ),
-//                         //   title: Text(
-//                         //     t.nombreStr, 
-//                         //     style: TextStyle(
-//                         //       fontWeight: FontWeight.bold,
-//                         //       decoration: esActivo ? null : TextDecoration.lineThrough,
-//                         //       color: esActivo ? Colors.black87 : Colors.grey.shade600,
-//                         //     ),
-//                         //   ),
-//                         //   subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
-                          
-//                         //   // CLICK NORMAL: Ver Perfil
-//                         //   onTap: () {
-//                         //     Navigator.push(
-//                         //       context,
-//                         //       MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
-//                         //     );
-//                         //   },
-
-//                         //   // CLICK EN TRES PUNTITOS: Acciones
-//                         //   trailing: PopupMenuButton<String>(
-//                         //     icon: const Icon(Icons.more_vert, color: AgriPalette.greyMain),
-//                         //     onSelected: (String result) async {
-//                         //       if (result == 'editar') {
-//                         //         final res = await Navigator.push(
-//                         //           context,
-//                         //           MaterialPageRoute(builder: (context) => PageTrabajadorForm(trabajador: t)),
-//                         //         );
-//                         //         if (res == true) _cargarTrabajadores();
-//                         //       } else if (result == 'alta') {
-//                         //         _cambiarEstadoContrato(t, true);
-//                         //       } else if (result == 'baja') {
-//                         //         _cambiarEstadoContrato(t, false);
-//                         //       } else if (result == 'eliminar') {
-//                         //         _eliminarTrabajador(t);
-//                         //       }
-//                         //     },
-//                         //     itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-//                         //       const PopupMenuItem<String>(
-//                         //         value: 'editar',
-//                         //         child: ListTile(leading: Icon(Icons.edit, color: AgriPalette.greenMain), title: Text('Editar'), contentPadding: EdgeInsets.zero, dense: true),
-//                         //       ),
-//                         //       if (!esActivo)
-//                         //         const PopupMenuItem<String>(
-//                         //           value: 'alta',
-//                         //           child: ListTile(leading: Icon(Icons.person_add, color: Colors.blue), title: Text('Dar de Alta'), contentPadding: EdgeInsets.zero, dense: true),
-//                         //         ),
-//                         //       if (esActivo)
-//                         //         const PopupMenuItem<String>(
-//                         //           value: 'baja',
-//                         //           child: ListTile(leading: Icon(Icons.person_remove, color: Colors.orange), title: Text('Dar de Baja'), contentPadding: EdgeInsets.zero, dense: true),
-//                         //         ),
-//                         //       const PopupMenuItem<String>(
-//                         //         value: 'eliminar',
-//                         //         child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Eliminar', style: TextStyle(color: Colors.red)), contentPadding: EdgeInsets.zero, dense: true),
-//                         //       ),
-//                         //     ],
-//                         //   ),
-//                         // );
-//                       return ListTile(
-//                         dense: true, // <--- Compacta el interlineado
-//                         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0), // <--- Reduce la altura de la fila
-//                         leading: CircleAvatar(
-//                           backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
-//                           child: const Icon(Icons.person, color: Colors.white),
-//                         ),
-//                         title: Text(
-//                           t.nombreStr, 
-//                           style: TextStyle(
-//                             fontWeight: FontWeight.bold,
-//                             decoration: esActivo ? null : TextDecoration.lineThrough,
-//                             color: esActivo ? Colors.black87 : Colors.grey.shade600,
-//                           ),
-//                         ),
-//                         subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
-                        
-//                         // 1. ESPERAR RESULTADO DEL PERFIL
-//                         onTap: () async {
-//                           final editado = await Navigator.push(
-//                             context,
-//                             MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
-//                           );
-//                           // Si se editó en el perfil, refrescamos la lista
-//                           if (editado == true) _cargarTrabajadores();
-//                         },
-
-//                         // 2. SUSTITUIR EL POPUPMENU POR ICONOS DIRECTOS VERDES
-//                         trailing: Row(
-//                           mainAxisSize: MainAxisSize.min,
-//                           children: [
-//                             IconButton(
-//                               icon: Icon(
-//                                 esActivo ? Icons.person_remove : Icons.person_add, 
-//                                 color: AgriPalette.greenMain, // Siempre verde
-//                               ),
-//                               onPressed: () => _cambiarEstadoContrato(t, !esActivo),
-//                             ),
-//                             IconButton(
-//                               icon: const Icon(Icons.delete, color: AgriPalette.greenMain), // Siempre verde
-//                               onPressed: () => _eliminarTrabajador(t),
-//                             ),
-//                           ],
-//                         ),
-//                       );
-//                       },
-//                     ),
-//           ),
-//         ],
-//       ),
-//       floatingActionButton: FloatingActionButton(
-//         backgroundColor: AgriPalette.greenMain,
-//         child: const Icon(Icons.add, color: Colors.white),
-//         onPressed: () async {
-//           final result = await Navigator.push(
-//             context,
-//             MaterialPageRoute(builder: (context) => const PageTrabajadorForm()),
-//           );
-//           if (result == true) {
-//             _cargarTrabajadores(); 
-//           }
-//         },
-//       ),
-//     );
-//   }
-// }
-
-
-// import 'package:flutter/material.dart';
-// import '../models/record_trabajador.dart';
-// import '../services/api_service.dart';
-// import '../utils/app_palette.dart';
-// import '../pages/page_trabajador_add.dart';
-
-
-// class PageTrabajadores extends StatefulWidget {
-//   const PageTrabajadores({Key? key}) : super(key: key);
-
-//   @override
-//   State<PageTrabajadores> createState() => _PageTrabajadoresState();
-// }
-
-// class _PageTrabajadoresState extends State<PageTrabajadores> {
-//   final ApiService _apiService = ApiService();
-  
-//   // Lista maestra que almacena TODOS los trabajadores bajados de la API
-//   List<Trabajador> _todosLosTrabajadores = [];
-  
-//   // Lista dinámica que se dibuja en pantalla (cambia al escribir o pulsar el switch)
-//   List<Trabajador> _trabajadoresFiltrados = [];
-
-//   bool _cargando = true;
-//   bool _mostrarSoloActivos = true; // Checkbox/Switch activado por defecto
-//   String _busqueda = ""; // Lo que el usuario escribe
-  
-//   final TextEditingController _searchController = TextEditingController();
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _cargarTrabajadores();
-//   }
-
-//   Future<void> _cargarTrabajadores() async {
-//     setState(() => _cargando = true);
-//     try {
-//       // 1. Cargamos TODOS los trabajadores usando tu endpoint genérico
-//       final rawData = await _apiService.fetchList('tbltrabajador');
-//       _todosLosTrabajadores = rawData.map((json) => Trabajador.fromJson(json)).toList();
-      
-//       // 2. Aplicamos filtros iniciales
-//       _filtrarYOrdenar();
-//     } catch (e) {
-//       print("Error cargando trabajadores: $e");
-//     } finally {
-//       setState(() => _cargando = false);
-//     }
-//   }
-
-//   /// Motor de filtrado en tiempo real
-//   void _filtrarYOrdenar() {
-//     List<Trabajador> temp = _todosLosTrabajadores.where((t) {
-//       // A. Filtro por nombre (Texto a minúsculas para que no importe cómo escriban)
-//       final nombreCoincide = t.nombreStr.toLowerCase().contains(_busqueda.toLowerCase());
-//       if (!nombreCoincide) return false;
-
-//       // B. Filtro por Activos / Inactivos
-//       // Asumimos que eliminadoBit = true o 1 significa Inactivo. 
-//       // ADAPTAR: Si tu modelo lo mapea como int o bool, ajústalo aquí.
-//       bool estaEliminado = t.eliminado_bit == 1 || t.eliminado_bit == true;
-      
-//       if (_mostrarSoloActivos && estaEliminado) {
-//         return false; // Si solo queremos activos y está eliminado, lo ocultamos
-//       }
-
-//       return true; // Pasa todos los filtros
-//     }).toList();
-
-//     // C. Ordenar del más nuevo al más antiguo 
-//     // ADAPTAR: Si en tu Record_Trabajador no tienes mapeado 'fecha_dtm', deberás mapearlo.
-//     // temp.sort((a, b) => b.fecha_dtm.compareTo(a.fecha_dtm));
-
-//     setState(() {
-//       _trabajadoresFiltrados = temp;
-//     });
-//   }
-
-//   @override
-//   void dispose() {
-//     _searchController.dispose();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Gestión de personal")),
-//       body: Column(
-//         children: [
-//           // --- ZONA DE FILTROS ---
-//           Padding(
-//             padding: const EdgeInsets.all(16.0),
-//             child: TextField(
-//               controller: _searchController,
-//               decoration: InputDecoration(
-//                 labelText: 'Buscar por nombre...',
-//                 prefixIcon: const Icon(Icons.search, color: AgriPalette.greenMain),
-//                 border: OutlineInputBorder(
-//                   borderRadius: BorderRadius.circular(12),
-//                 ),
-//               ),
-//               onChanged: (valor) {
-//                 // Al escribir, actualiza la variable y lanza el filtro
-//                 _busqueda = valor;
-//                 _filtrarYOrdenar();
-//               },
-//             ),
-//           ),
-//           SwitchListTile(
-//             title: const Text("Mostrar solo trabajadores activos"),
-//             value: _mostrarSoloActivos,
-//             activeColor: AgriPalette.greenMain,
-//             onChanged: (valor) {
-//               setState(() {
-//                 _mostrarSoloActivos = valor;
-//                 _filtrarYOrdenar();
-//               });
-//             },
-//           ),
-//           const Divider(),
-          
-//           // --- ZONA DE RESULTADOS ---
-//           Expanded(
-//             child: _cargando 
-//               ? const Center(child: CircularProgressIndicator())
-//               : _trabajadoresFiltrados.isEmpty
-//                   ? const Center(child: Text("No se encontraron trabajadores"))
-//                   : ListView.builder(
-//                       itemCount: _trabajadoresFiltrados.length,
-//                       itemBuilder: (context, index) {
-//                         final t = _trabajadoresFiltrados[index];
-//                         final bool esInactivo = t.eliminado_bit == 1 || t.eliminado_bit == true;
-
-//                         return ListTile(
-//                           leading: CircleAvatar(
-//                             backgroundColor: esInactivo ? Colors.grey : AgriPalette.greenMain,
-//                             child: const Icon(Icons.person, color: Colors.white),
-//                           ),
-//                           title: Text(
-//                             t.nombreStr, 
-//                             style: TextStyle(
-//                               fontWeight: FontWeight.bold,
-//                               decoration: esInactivo ? TextDecoration.lineThrough : null,
-//                             ),
-//                           ),
-//                           subtitle: Text(t.dniStr ?? "Sin DNI"),
-//                           trailing: IconButton(
-//                             icon: const Icon(Icons.edit, color: AgriPalette.greyMain),
-//                             onPressed: () { /* Navegar a editar */ },
-//                           ),
-//                         );
-//                       },
-//                     ),
-//           ),
-//         ],
-//       ),
-//       floatingActionButton: FloatingActionButton(
-//         backgroundColor: AgriPalette.greenMain,
-//         child: const Icon(Icons.add, color: Colors.white),
-//         onPressed: () async {
-//           final result = await Navigator.push(
-//             context,
-//             MaterialPageRoute(builder: (context) => const PageTrabajadorForm()),
-//           );
-//           if (result == true) {
-//             _cargarTrabajadores(); // Refrescamos la lista si se creó uno nuevo
-//           }
-//         },
-//       ),
-//     );
-//   }
-// }
-
-
-// import 'package:flutter/material.dart';
-// import '../models/record_trabajador.dart';
-// import '../services/api_service.dart';
-// import '../utils/app_palette.dart';
-// import '../pages/page_trabajador_add.dart';
-
-// class PageTrabajadores extends StatefulWidget {
-//   const PageTrabajadores({Key? key}) : super(key: key);
-
-//   @override
-//   State<PageTrabajadores> createState() => _PageTrabajadoresState();
-// }
-
-// class _PageTrabajadoresState extends State<PageTrabajadores> {
-//   final ApiService _apiService = ApiService();
-  
-//   List<Trabajador> _todosLosTrabajadores = [];
-//   List<Trabajador> _trabajadoresFiltrados = [];
-
-//   bool _cargando = true;
-//   bool _mostrarSoloActivos = true; // El Check empieza marcado
-//   String _busqueda = "";
-  
-//   final TextEditingController _searchController = TextEditingController();
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _cargarTrabajadores();
-//   }
-
-//   Future<void> _cargarTrabajadores() async {
-//     setState(() => _cargando = true);
-//     try {
-//       final rawData = await _apiService.fetchList('tbltrabajador');
-//       _todosLosTrabajadores = rawData.map((json) => Trabajador.fromJson(json)).toList();
-//       _filtrarYOrdenar();
-//     } catch (e) {
-//       print("Error cargando trabajadores: $e");
-//     } finally {
-//       if (mounted) setState(() => _cargando = false);
-//     }
-//   }
-
-//   /// Motor de filtrado y ordenación
-//   void _filtrarYOrdenar() {
-//     List<Trabajador> temp = _todosLosTrabajadores.where((t) {
-//       // 1. Filtro por nombre (en tiempo real)
-//       final nombreCoincide = t.nombreStr.toLowerCase().contains(_busqueda.toLowerCase());
-//       if (!nombreCoincide) return false;
-
-//       // 2. Cálculo de Activo vs Inactivo
-//       bool esActivo = false;
-//       final hoy = DateTime.now();
-//       final fechaHoyLimpia = DateTime(hoy.year, hoy.month, hoy.day); // Ignoramos las horas
-
-//       if (t.fechaInicioContrato != null) {
-//         final inicio = DateTime(t.fechaInicioContrato!.year, t.fechaInicioContrato!.month, t.fechaInicioContrato!.day);
-//         // Si el contrato empezó hoy o en el pasado
-//         if (!inicio.isAfter(fechaHoyLimpia)) {
-//           esActivo = true;
-//         }
-//       }
-
-//       if (esActivo && t.fechaFinContrato != null) {
-//         final fin = DateTime(t.fechaFinContrato!.year, t.fechaFinContrato!.month, t.fechaFinContrato!.day);
-//         // Si tiene fecha fin y ya pasó
-//         if (fin.isBefore(fechaHoyLimpia)) {
-//           esActivo = false;
-//         }
-//       }
-
-//       // Si el check está marcado y NO está activo, lo ocultamos
-//       if (_mostrarSoloActivos && !esActivo) {
-//         return false;
-//       }
-
-//       return true; // Pasa los filtros
-//     }).toList();
-
-//     // 3. Ordenar siempre del más nuevo al más antiguo (fecha de creación)
-//     temp.sort((a, b) {
-//       final fechaA = a.fechaCreacion ?? DateTime(2000);
-//       final fechaB = b.fechaCreacion ?? DateTime(2000);
-//       return fechaB.compareTo(fechaA); // Orden descendente
-//     });
-
-//     setState(() {
-//       _trabajadoresFiltrados = temp;
-//     });
-//   }
-
-//   @override
-//   void dispose() {
-//     _searchController.dispose();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Gestión de personal")),
-//       body: Column(
-//         children: [
-//           // --- BARRA DE BÚSQUEDA Y CHECKBOX (EN LA MISMA FILA) ---
-//           Padding(
-//             padding: const EdgeInsets.all(16.0),
-//             child: Row(
-//               children: [
-//                 // Buscador ocupando el espacio izquierdo
-//                 Expanded(
-//                   child: TextField(
-//                     controller: _searchController,
-//                     decoration: InputDecoration(
-//                       labelText: 'Buscar por nombre...',
-//                       prefixIcon: const Icon(Icons.search, color: AgriPalette.greenMain),
-//                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-//                       border: OutlineInputBorder(
-//                         borderRadius: BorderRadius.circular(12),
-//                       ),
-//                     ),
-//                     onChanged: (valor) {
-//                       _busqueda = valor;
-//                       _filtrarYOrdenar(); // Filtra instantáneamente
-//                     },
-//                   ),
-//                 ),
-//                 const SizedBox(width: 8),
-                
-//                 // Zona del Checkbox recortada a la derecha
-//                 InkWell(
-//                   onTap: () {
-//                     setState(() {
-//                       _mostrarSoloActivos = !_mostrarSoloActivos;
-//                       _filtrarYOrdenar();
-//                     });
-//                   },
-//                   borderRadius: BorderRadius.circular(8),
-//                   child: Padding(
-//                     padding: const EdgeInsets.all(8.0),
-//                     child: Row(
-//                       mainAxisSize: MainAxisSize.min,
-//                       children: [
-//                         Checkbox(
-//                           value: _mostrarSoloActivos,
-//                           activeColor: AgriPalette.greenMain,
-//                           onChanged: (valor) {
-//                             setState(() {
-//                               _mostrarSoloActivos = valor ?? true;
-//                               _filtrarYOrdenar();
-//                             });
-//                           },
-//                         ),
-//                         const Text("Activos", style: TextStyle(fontWeight: FontWeight.bold)),
-//                       ],
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           const Divider(height: 1),
-          
-//           // --- LISTA DE TRABAJADORES ---
-//           Expanded(
-//             child: _cargando 
-//               ? const Center(child: CircularProgressIndicator())
-//               : _trabajadoresFiltrados.isEmpty
-//                   ? const Center(child: Text("No se encontraron trabajadores"))
-//                   : ListView.builder(
-//                       itemCount: _trabajadoresFiltrados.length,
-//                       itemBuilder: (context, index) {
-//                         final t = _trabajadoresFiltrados[index];
-
-//                         // Volvemos a calcular el estado visual para pintar los inactivos de gris
-//                         bool esActivo = false;
-//                         final fechaHoyLimpia = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-//                         if (t.fechaInicioContrato != null) {
-//                           final inicio = DateTime(t.fechaInicioContrato!.year, t.fechaInicioContrato!.month, t.fechaInicioContrato!.day);
-//                           if (!inicio.isAfter(fechaHoyLimpia)) esActivo = true;
-//                         }
-//                         if (esActivo && t.fechaFinContrato != null) {
-//                           final fin = DateTime(t.fechaFinContrato!.year, t.fechaFinContrato!.month, t.fechaFinContrato!.day);
-//                           if (fin.isBefore(fechaHoyLimpia)) esActivo = false;
-//                         }
-
-//                         return ListTile(
-//                           leading: CircleAvatar(
-//                             backgroundColor: esActivo ? AgriPalette.greenMain : Colors.grey.shade400,
-//                             child: const Icon(Icons.person, color: Colors.white),
-//                           ),
-//                           title: Text(
-//                             t.nombreStr, 
-//                             style: TextStyle(
-//                               fontWeight: FontWeight.bold,
-//                               // Si está inactivo, tachamos el nombre sutilmente
-//                               decoration: esActivo ? null : TextDecoration.lineThrough,
-//                               color: esActivo ? Colors.black87 : Colors.grey.shade600,
-//                             ),
-//                           ),
-//                           subtitle: Text(t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI"),
-//                           trailing: IconButton(
-//                             icon: const Icon(Icons.edit, color: AgriPalette.greyMain),
-//                             onPressed: () { /* Navegar a editar */ },
-//                           ),
-//                         );
-//                       },
-//                     ),
-//           ),
-//         ],
-//       ),
-//       floatingActionButton: FloatingActionButton(
-//         backgroundColor: AgriPalette.greenMain,
-//         child: const Icon(Icons.add, color: Colors.white),
-//         onPressed: () async {
-//           final result = await Navigator.push(
-//             context,
-//             MaterialPageRoute(builder: (context) => const PageTrabajadorForm()),
-//           );
-//           if (result == true) {
-//             _cargarTrabajadores();
-//           }
-//         },
-//       ),
-//     );
-//   }
-// }

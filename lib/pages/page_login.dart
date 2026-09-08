@@ -319,31 +319,18 @@ Future<void> _abrirUrl(String url) async {
               ),
             ],
 
+// Cambiamos el Spacer para empujarlo hacia abajo, pero sin aplastarlo
             const Spacer(flex: 2), 
             
             // --- TEXTO DINÁMICO DEL SERVIDOR ---
-// --- TEXTO DINÁMICO DEL SERVIDOR ---
-            if (_mensajeInfo != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20.0), // Separación con el borde inferior
-                child: _buildTextoConEnlace(_mensajeInfo!),
+            if (_mensajeInfo != null && _mensajeInfo!.isNotEmpty)
+              // SafeArea protege el texto de los botones de navegación de Android/iOS
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 30.0), // Aumentamos este valor a 30
+                  child: _buildTextoConEnlace(_mensajeInfo!),
+                ),
               ),
-              // Padding(
-              //   padding: const EdgeInsets.only(bottom: 2.0),
-              //   child: Linkify(
-              //     onOpen: (link) async {
-              //       final Uri url = Uri.parse(link.url);
-              //       if (await canLaunchUrl(url)) {
-              //         await launchUrl(url, mode: LaunchMode.externalApplication);
-              //       }
-              //     },
-              //     // AÑADE ?? '' AQUÍ:
-              //     text: _mensajeInfo ?? '', 
-              //     textAlign: TextAlign.center,
-              //     style: const TextStyle(color: Colors.grey, fontSize: 12),
-              //     linkStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-              //   )
-              // ),
           ],
         ),
       ),

@@ -20,6 +20,8 @@ class ApiService {
 static const String baseUrl = 'https://api.bueso.online/api';
   // --- MÉTODOS DE APOYO (HELPERS) ---
 
+static const String dominioWeb = baseUrl; //'https://api.bueso.duckdns.org';  
+
   // Obtiene el token que guardamos en el móvil al hacer login
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
