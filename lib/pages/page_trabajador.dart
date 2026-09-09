@@ -124,7 +124,10 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
       }
 
       // Construimos la URL personalizada
-      final String urlMarcaje = "${ApiService.dominioWeb}/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
+      final String urlsinApi = ApiService.dominioWeb.replaceAll("/api", "");
+      print("urlsinApi: $urlsinApi");
+      final String urlMarcaje = "$urlsinApi/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
+      print("Enlace de marcaje generado: $urlMarcaje");
       
       // Texto amigable para enviar por WhatsApp
       final String mensaje = "Hola ${t.nombreStr}, haz clic en el siguiente enlace para registrar tu jornada:\n$urlMarcaje";
@@ -160,7 +163,8 @@ Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
         return;
       }
 
-      final String urlMarcaje = "${ApiService.dominioWeb}/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
+      final String urlsinApi = ApiService.dominioWeb.substring(0, ApiService.dominioWeb.length - 4); // Eliminamos "/api" del final
+      final String urlMarcaje = "$urlsinApi/marcaje.php?finca=$fincaMarcaje&dni=${t.dniStr}";
       final String mensaje = "Hola ${t.nombreStr}, haz clic en el siguiente enlace para registrar tu jornada:\n$urlMarcaje";
 
       // 1. Preparamos el enlace nativo de WhatsApp
@@ -397,7 +401,16 @@ Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
                         final t = _trabajadoresFiltrados[index];
                         final bool esActivo = _calcularSiEsActivo(t);
 
-                      return Container(
+return InkWell(
+                        // AQUÍ AÑADIMOS EL ONTAP QUE NOS HAS PASADO
+                        onTap: () async {
+                          final editado = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => PageTrabajadorPerfil(trabajador: t, esActivo: esActivo)),
+                          );
+                          if (editado == true) _cargarTrabajadores();
+                        },
+                        child: Container(
                           decoration: BoxDecoration(
                             border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                           ),
@@ -412,7 +425,7 @@ Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
                               ),
                               const SizedBox(width: 10),
                               
-                              // Texto (Nombre y DNI) - Se expande para empujar los botones a la derecha
+                              // Texto (Nombre y DNI)
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,7 +448,7 @@ Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
                                 ),
                               ),
 
-                              // Fila compacta de botones
+                              // Fila compacta de botones (Se ha quitado el botón de Eliminar)
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -462,16 +475,90 @@ Future<void> _compartirMarcajeWhatsApp(Trabajador t) async {
                                       color: AgriPalette.greenMain,
                                       onPressed: () => _bajaConFecha(t),
                                     ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    color: AgriPalette.greenMain,
-                                    onPressed: () => _eliminarTrabajador(t),
-                                  ),
                                 ],
                               ),
                             ],
                           ),
-                        );
+                        ),
+                      );
+                      // return Container(
+                      //     decoration: BoxDecoration(
+                      //       border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+                      //     ),
+                      //     padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 5.0),
+                      //     child: Row(
+                      //       children: [
+                      //         // Avatar
+                              
+                      //         CircleAvatar(
+                      //           radius: 18,
+                      //           backgroundColor: esActivo ? theme.primaryColor : theme.disabledColor,
+                      //           child: const Icon(Icons.person, color: AgriPalette.white, size: 18),
+
+                      //         ),
+                      //         const SizedBox(width: 10),
+                              
+                      //         // Texto (Nombre y DNI) - Se expande para empujar los botones a la derecha
+                      //         Expanded(
+                      //           child: Column(
+                      //             crossAxisAlignment: CrossAxisAlignment.start,
+                      //             children: [
+                      //               Text(
+                      //                 t.nombreStr,
+                      //                 maxLines: 1,
+                      //                 overflow: TextOverflow.ellipsis,
+                      //                 style: theme.textTheme.bodyLarge?.copyWith(
+                      //                   fontWeight: FontWeight.bold,
+                      //                   decoration: esActivo ? null : TextDecoration.lineThrough,
+                      //                   color: esActivo ? theme.textTheme.bodyLarge?.color : theme.disabledColor,
+                      //                 ),
+                      //               ),
+                      //               Text(
+                      //                 t.dniStr != null && t.dniStr!.isNotEmpty ? t.dniStr! : "Sin DNI",
+                      //                 style: theme.textTheme.bodySmall,
+                      //               ),
+                      //             ],
+                      //           ),
+                      //         ),
+
+                      //         // Fila compacta de botones
+                      //         Row(
+                      //           mainAxisSize: MainAxisSize.min,
+                      //           children: [
+                      //             IconButton(
+                      //               icon: const Icon(Icons.lock),
+                      //               color: AgriPalette.greenMain,
+                      //               tooltip: 'Definir Contraseña',
+                      //               onPressed: () => _cambiarPasswordTrabajador(t),
+                      //             ),
+                      //             IconButton(
+                      //               icon: const Icon(Icons.share),
+                      //               color: AgriPalette.greenMain,
+                      //               tooltip: 'Compartir Marcaje',
+                      //               onPressed: () => _compartirMarcajeWhatsApp(t),
+                      //             ),
+                      //             IconButton(
+                      //               icon: Icon(esActivo ? Icons.person_remove : Icons.person_add),
+                      //               color: AgriPalette.greenMain,
+                      //               onPressed: () => _cambiarEstadoContrato(t, !esActivo),
+                      //             ),
+                      //             if (esActivo)
+                      //               IconButton(
+                      //                 icon: const Icon(Icons.edit_calendar),
+                      //                 color: AgriPalette.greenMain,
+                      //                 onPressed: () => _bajaConFecha(t),
+                      //               ),
+                      //             // IconButton(
+                      //             //   icon: const Icon(Icons.delete),
+                      //             //   color: AgriPalette.greenMain,
+                      //             //   onPressed: () => _eliminarTrabajador(t),
+                      //             // ),
+                      //           ],
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   );
+                      
                       },
                     ),
           ),
