@@ -21,6 +21,7 @@ function getAlbaranesV2(Request $request, Response $response): Response {
                    fechadesde_dtm, fechahasta_dtm, numcampanias_int, kagricultor
             FROM tblalbaran
             WHERE kagricultor = ?
+            AND (eliminado_bit IS NULL OR eliminado_bit = b'0' OR eliminado_bit = 0)
         ");
         $stmt->bind_param("s", $kagricultor);
         $stmt->execute();
@@ -37,6 +38,7 @@ function getAlbaranesV2(Request $request, Response $response): Response {
                        fecha_dtm, total_flt
                 FROM tblalbarandetalle
                 WHERE kalbaran = ?
+                AND (eliminado_bit IS NULL OR eliminado_bit = b'0' OR eliminado_bit = 0)
             ");
             $stmtDetalle->bind_param("s", $kalbaran);
             $stmtDetalle->execute();
@@ -54,6 +56,7 @@ function getAlbaranesV2(Request $request, Response $response): Response {
                        campo1_str, tipo_str, eliminado_bit, fechaeliminacion_dtm
                 FROM tblArchivos
                 WHERE kuuid = ?
+                AND (eliminado_bit IS NULL OR eliminado_bit = b'0' OR eliminado_bit = 0)
             ");
             $stmtArchivo->bind_param("s", $kalbaran);
             $stmtArchivo->execute();

@@ -147,8 +147,10 @@ class _DashboardPageState extends State<DashboardPage> {
               backgroundColor: AgriPalette.greenMain,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("SALIR", style: TextStyle(color: Colors.white)),
+            onPressed: 
+                       () => Navigator.pop(context, true),
+            child: const Text("SALIR", style: TextStyle(color: Colors.white))
+            ,
           ),
         ],
       ),
@@ -158,6 +160,7 @@ class _DashboardPageState extends State<DashboardPage> {
       try {
         await SyncService.sincronizarTodo();
         DBService.instance.limpiarTodaLaBaseDeDatos();
+        await DBService.instance.borrarBaseDeDatosFisica();
         if (mounted) await _apiService.cerrarSesion(context);
       } catch (e) {
         if (e.toString().contains("Expired token") && mounted) {
@@ -213,6 +216,37 @@ class _DashboardPageState extends State<DashboardPage> {
     mensajeEmergente(context, 'Simulando refresco de Operaciones...',segundos: 1);
   }
 
+Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar línea?'),
+        content: Text('Se eliminará la línea ${m.detalleOriginal.linea} (${m.nombreProducto} - ${m.kg} kg).'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: colorEliminar),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar', style: TextStyle(color: colorFondo)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _apiService.deleteGeneric('tblalbarandetalle', m.detalleOriginal.kalbarandetalle);
+        await _refreshAlbaranes();
+        if (mounted) {
+          mensajeEmergente(context, "Línea eliminada correctamente");
+        }
+      } catch (e) {
+        if (!mounted) return;
+        mensajeEmergente(context, 'Error al eliminar línea: $e', tipo: 'error');
+      }
+    }
+  }
+
   Future<void> _confirmDeleteAlbaran(Albaran albaran) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -231,21 +265,27 @@ class _DashboardPageState extends State<DashboardPage> {
     );
 
     if (confirm == true) {
-      try {
-        await _apiService.putGeneric('tblalbaran', albaran.kalbaran, {'eliminado_bit': 1});
+    try {
+            // 1. Usamos deleteGeneric: tu API ya marca eliminado_bit = 1 y fechaeliminacion_dtm
+            await _apiService.deleteGeneric('tblalbaran', albaran.kalbaran);
 
-        for (var detalle in albaran.detalles) {
-          if (detalle.kalbarandetalle.isNotEmpty) {
-            await _apiService.putGeneric('tblalbarandetalle', detalle.kalbarandetalle, {'eliminado_bit': 1});
-          }
-        }
+            for (var detalle in albaran.detalles) {
+              if (detalle.kalbarandetalle.isNotEmpty) {
+                await _apiService.deleteGeneric('tblalbarandetalle', detalle.kalbarandetalle);
+              }
+            }
 
-        setState(() {
-          _albaranes.removeWhere((a) => a.kalbaran == albaran.kalbaran);
-        });
+            // 2. Si usas tabla SQLite local, borramos el registro para que el Stream no lo resucite
+            final db = await DBService.instance.database;
+            await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [albaran.kalbaran]);
 
-        mensajeEmergente(context, "Albarán eliminado correctamente");
-      } catch (e) {
+            // 3. Forzamos la recarga de datos frescos del servidor
+            await _refreshAlbaranes();
+
+            if (mounted) {
+              mensajeEmergente(context, "Albarán eliminado correctamente");
+            }
+          } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -688,7 +728,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, size: 20, color: AgriPalette.greenMain),
-                  onPressed: () => _confirmDeleteAlbaran(m.albaranPadre),
+                  //onPressed: () => _confirmDeleteAlbaran(m.albaranPadre),
+                  onPressed: () => _confirmDeleteDetalle(m),
                 ),
               ],
             ),

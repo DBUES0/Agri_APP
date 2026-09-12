@@ -10,8 +10,11 @@ class DBService {
 
   DBService._init();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
+Future<Database> get database async {
+    // CAMBIO: Si existe pero está cerrada, la tratamos como nula
+    if (_database != null && _database!.isOpen) {
+      return _database!;
+    }
     _database = await _initDB('agri_app.db');
     return _database!;
   }
@@ -132,9 +135,14 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     }
   }
 Future<void> limpiarTodaLaBaseDeDatos() async {
-  final db = await database;
-  await db.delete('local_cache'); // Borra la caché de productos/almacenes/etc
-  await db.delete('pendientes_sincro'); // Limpia pendientes de otros
+  // final db = await database;
+  // await db.delete('local_cache'); // Borra la caché de productos/almacenes/etc
+  // await db.delete('pendientes_sincro'); // Limpia pendientes de otros
+    final db = await database;
+    // Vaciamos las tablas sin cerrar la conexión
+    await db.delete('local_cache');
+    await db.delete('pendientes_sincro');
+    // Si tienes más tablas locales, añade: await db.delete('nombre_tabla');
 }
 
 /// Destruye el archivo físico de la base de datos por completo.
