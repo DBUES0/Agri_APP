@@ -1,3 +1,4 @@
+// lib/pages/page_jornada_add.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -24,10 +25,12 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
   List<Trabajador> _activosEnFecha = [];
   bool _seleccionarTodos = false;
   
-  // Mapas para controlar el estado y textos de cada trabajador individualmente
+  // Mapas de control por cada trabajador
   final Map<String, bool> _checksTrabajadores = {};
   final Map<String, TextEditingController> _obsControllers = {};
   final Map<String, TextEditingController> _horasIndividualesControllers = {};
+  final Map<String, TextEditingController> _horarioIndividualControllers = {};
+  final Map<String, String> _marcajesPorTrabajador = {};
 
   bool _cargando = true;
   bool _guardando = false;
@@ -40,6 +43,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
 
   Future<void> _inicializarPantalla() async {
     await _cargarUltimoHorario();
+    await _cargarMarcajesDelDia();
     _filtrarTrabajadoresPorFecha();
     if (mounted) setState(() => _cargando = false);
   }
@@ -62,6 +66,45 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       }
     } catch (e) {
       print("Error cargando último horario: $e");
+    }
+  }
+
+  // Consulta los marcajes existentes en la fecha seleccionada y genera el resumen HH:mm
+  Future<void> _cargarMarcajesDelDia() async {
+    final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
+    try {
+      final raw = await _apiService.fetchList('tblmarcaje');
+      
+      final marcajesHoy = raw.where((m) {
+        final d = m['fechamarcaje_dtm']?.toString() ?? '';
+        final elim = m['eliminado_bit'] == 1 || m['eliminado_bit'] == true;
+        return d.startsWith(fechaStr) && !elim;
+      }).toList();
+
+      marcajesHoy.sort((a, b) => (a['fechamarcaje_dtm'] ?? '').compareTo(b['fechamarcaje_dtm'] ?? ''));
+
+      final Map<String, List<DateTime>> grupos = {};
+      for (var m in marcajesHoy) {
+        final kId = (m['ktrabajador'] ?? '').toString();
+        final dt = DateTime.tryParse(m['fechamarcaje_dtm'] ?? '');
+        if (kId.isNotEmpty && dt != null) {
+          grupos.putIfAbsent(kId, () => []).add(dt);
+        }
+      }
+
+      final DateFormat horaFormat = DateFormat('HH:mm');
+      _marcajesPorTrabajador.clear();
+      for (var entry in grupos.entries) {
+        if (entry.value.length == 1) {
+          _marcajesPorTrabajador[entry.key] = horaFormat.format(entry.value.first);
+        } else if (entry.value.length >= 2) {
+          _marcajesPorTrabajador[entry.key] = 
+              "${horaFormat.format(entry.value.first)}-${horaFormat.format(entry.value.last)}";
+        }
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      print("Error cargando marcajes del día: $e");
     }
   }
 
@@ -89,6 +132,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       _checksTrabajadores[t.ktrabajador] = false;
       _obsControllers[t.ktrabajador] ??= TextEditingController(); 
       _horasIndividualesControllers[t.ktrabajador] ??= TextEditingController();
+      _horarioIndividualControllers[t.ktrabajador] ??= TextEditingController();
     }
     setState(() {});
   }
@@ -105,8 +149,9 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
     if (picked != null && picked != _fechaSeleccionada) {
       setState(() {
         _fechaSeleccionada = picked;
-        _filtrarTrabajadoresPorFecha();
       });
+      await _cargarMarcajesDelDia();
+      _filtrarTrabajadoresPorFecha();
     }
   }
 
@@ -115,11 +160,12 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       _seleccionarTodos = valor ?? false;
       for (var t in _activosEnFecha) {
         _checksTrabajadores[t.ktrabajador] = _seleccionarTodos;
-        // Al seleccionar, copiamos las horas globales al trabajador individual
         if (_seleccionarTodos) {
           _horasIndividualesControllers[t.ktrabajador]!.text = _horasGlobalController.text;
+          _horarioIndividualControllers[t.ktrabajador]!.text = _horarioController.text;
         } else {
           _horasIndividualesControllers[t.ktrabajador]!.clear();
+          _horarioIndividualControllers[t.ktrabajador]!.clear();
         }
       }
     });
@@ -128,11 +174,12 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
   void _toggleTrabajador(String ktrabajador, bool valor) {
     setState(() {
       _checksTrabajadores[ktrabajador] = valor;
-      // Al marcar uno individualmente, hereda las horas de la cabecera
       if (valor) {
         _horasIndividualesControllers[ktrabajador]!.text = _horasGlobalController.text;
+        _horarioIndividualControllers[ktrabajador]!.text = _horarioController.text;
       } else {
         _horasIndividualesControllers[ktrabajador]!.clear();
+        _horarioIndividualControllers[ktrabajador]!.clear();
       }
     });
   }
@@ -165,14 +212,15 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
           continue; 
         }
 
-        // Leemos las horas desde el controlador individual
         final horasStr = _horasIndividualesControllers[t.ktrabajador]?.text.replaceAll(',', '.') ?? '';
+        final horarioInd = _horarioIndividualControllers[t.ktrabajador]?.text.trim() ?? '';
+        final horarioFinal = horarioInd.isNotEmpty ? horarioInd : _horarioController.text.trim();
 
         final data = {
           'kjornada': const Uuid().v4(),
           'ktrabajador': t.ktrabajador,
           'fecha_dtm': fechaStr,
-          'horario_str': _horarioController.text.trim(),
+          'horario_str': horarioFinal,
           'horas_flt': double.tryParse(horasStr),
           'observaciones_str': _obsControllers[t.ktrabajador]?.text.trim(),
           'eliminado_bit': 0,
@@ -209,6 +257,9 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
       ctrl.dispose();
     }
     for (var ctrl in _horasIndividualesControllers.values) {
+      ctrl.dispose();
+    }
+    for (var ctrl in _horarioIndividualControllers.values) {
       ctrl.dispose();
     }
     super.dispose();
@@ -298,7 +349,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
           ),
           const Divider(height: 1),
 
-          // --- LISTA DE TRABAJADORES (COMPACTA Y EN LÍNEA) ---
+          // --- LISTA DE TRABAJADORES CON CAMPOS COMPACTOS Y MARCAJES ---
           Expanded(
             child: _activosEnFecha.isEmpty
                 ? const Center(child: Text("No hay trabajadores activos en esta fecha"))
@@ -307,6 +358,7 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                     itemBuilder: (context, index) {
                       final t = _activosEnFecha[index];
                       final bool seleccionado = _checksTrabajadores[t.ktrabajador] ?? false;
+                      final String? marcajeRef = _marcajesPorTrabajador[t.ktrabajador];
 
                       return Container(
                         decoration: BoxDecoration(
@@ -323,28 +375,44 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                               onChanged: (val) => _toggleTrabajador(t.ktrabajador, val ?? false),
                             ),
                             
-                            // NOMBRE DEL TRABAJADOR
+                            // NOMBRE DEL TRABAJADOR Y MARCAJE (TEXTO INFORMATIVO)
                             Expanded(
-                              flex: 4,
-                              child: Text(
-                                t.nombreStr,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    t.nombreStr,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  ),
+                                  if (marcajeRef != null && marcajeRef.isNotEmpty)
+                                    Text(
+                                      marcajeRef,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blueGrey.shade700,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             
-                            // HORAS Y OBSERVACIONES (Solo visibles si está seleccionado)
+                            // CAMPOS COMPACTOS (SOLO VISIBLES SI ESTÁ MARCADO)
                             if (seleccionado) ...[
                               const SizedBox(width: 4),
-                              Expanded(
-                                flex: 2,
+                              
+                              // 1. HORARIO INDIVIDUAL
+                              SizedBox(
+                                width: 82,
+                                height: 36,
                                 child: TextField(
-                                  controller: _horasIndividualesControllers[t.ktrabajador],
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  style: const TextStyle(fontSize: 13),
+                                  controller: _horarioIndividualControllers[t.ktrabajador],
+                                  style: const TextStyle(fontSize: 12),
                                   decoration: const InputDecoration(
-                                    hintText: 'H.',
+                                    hintText: 'Horario',
                                     isDense: true,
                                     contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                                     border: OutlineInputBorder(),
@@ -352,11 +420,33 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Expanded(
-                                flex: 5,
+
+                              // 2. HORAS (COMPACTO)
+                              SizedBox(
+                                width: 44,
+                                height: 36,
+                                child: TextField(
+                                  controller: _horasIndividualesControllers[t.ktrabajador],
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12),
+                                  decoration: const InputDecoration(
+                                    hintText: 'H.',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+
+                              // 3. OBSERVACIONES (COMPACTO)
+                              SizedBox(
+                                width: 62,
+                                height: 36,
                                 child: TextField(
                                   controller: _obsControllers[t.ktrabajador],
-                                  style: const TextStyle(fontSize: 13),
+                                  style: const TextStyle(fontSize: 12),
                                   decoration: const InputDecoration(
                                     hintText: 'Obs.',
                                     isDense: true,
@@ -365,8 +455,8 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                            ]
+                              const SizedBox(width: 6),
+                            ],
                           ],
                         ),
                       );

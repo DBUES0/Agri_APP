@@ -135,14 +135,11 @@ Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     }
   }
 Future<void> limpiarTodaLaBaseDeDatos() async {
-  // final db = await database;
-  // await db.delete('local_cache'); // Borra la caché de productos/almacenes/etc
-  // await db.delete('pendientes_sincro'); // Limpia pendientes de otros
-    final db = await database;
-    // Vaciamos las tablas sin cerrar la conexión
-    await db.delete('local_cache');
-    await db.delete('pendientes_sincro');
-    // Si tienes más tablas locales, añade: await db.delete('nombre_tabla');
+final db = await database;
+  if (!db.isOpen) return; // Si por cualquier motivo estuviera cerrada, evitamos el crash
+
+  await db.delete('local_cache');
+  await db.delete('pendientes_sincro');
 }
 
 /// Destruye el archivo físico de la base de datos por completo.

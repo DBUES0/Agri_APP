@@ -190,7 +190,7 @@ $app->get('/api/info', function (Request $request, Response $response) {
 
     // 2. Definir la versión más reciente de la app
     // Cámbialo aquí cuando compiles una nueva versión en Flutter
-    $versionUltima = "1.0.2"; 
+    $versionUltima = "1.0"; 
     $urlActualizacion = "https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk";
 
     return jsonResponse($response, [

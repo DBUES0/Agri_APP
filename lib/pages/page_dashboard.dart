@@ -66,6 +66,8 @@ class _DashboardPageState extends State<DashboardPage> {
   
   // --- NUEVAS VARIABLES PARA JORNADAS ---
   List<Map<String, dynamic>> _jornadas = [];
+  List<Trabajador> _trabajadores = [];
+  
   bool _cargandoJornadas = true;
   
   final ApiService _apiService = ApiService();
@@ -78,6 +80,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _albaranes = widget.albaranes;
+    _trabajadores = widget.trabajador;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _superRefresh();
@@ -87,10 +90,24 @@ class _DashboardPageState extends State<DashboardPage> {
       if (finalizadoOk && mounted) {
         _refreshAlbaranes();
         _refreshJornadas(); // Recargamos jornadas si hay sincro
+        _refreshTrabajadores(); // Recargamos trabajadores si hay sincro
       }
     });
   }
 
+  // --- NUEVA FUNCIÓN: CARGAR TRABAJADORES ---
+  Future<void> _refreshTrabajadores() async {
+    try {
+      final raw = await _apiService.fetchList('tbltrabajador');
+      if (mounted) {
+        setState(() {
+          _trabajadores = raw.map((json) => Trabajador.fromJson(json)).toList();
+        });
+      }
+    } catch (e) {
+      print("Error cargando trabajadores: $e");
+    }
+  }
   // --- NUEVA FUNCIÓN: CARGAR JORNADAS ---
   Future<void> _refreshJornadas() async {
     try {
@@ -159,7 +176,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (confirmar == true) {
       try {
         await SyncService.sincronizarTodo();
-        DBService.instance.limpiarTodaLaBaseDeDatos();
+        //DBService.instance.limpiarTodaLaBaseDeDatos();
         await DBService.instance.borrarBaseDeDatosFisica();
         if (mounted) await _apiService.cerrarSesion(context);
       } catch (e) {
@@ -201,9 +218,11 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {}); 
   }
 
+  // Método para refrescar todos los datos de la app, incluyendo albaranes, gastos, operaciones y jornadas. Se puede llamar desde un botón de sincronización manual.
   Future<void> _superRefresh() async {
     await SyncService.sincronizarTodo();
     await _refreshAlbaranes();
+    await _refreshTrabajadores(); // <--- AÑADIR ESTA LÍNEA
     await _refreshJornadas();
     setState(() {}); 
   }
@@ -500,17 +519,35 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
       }
       
       int dias = diasUnicos.length;
-      int personasMedia = dias > 0 ? (totalRegistrosPersonas / dias).round() : 0;
+      double personasMedia = dias > 0 ? (totalRegistrosPersonas / dias) : 0.0;
+      String personasStr = (personasMedia % 1 == 0) 
+        ? personasMedia.toInt().toString() 
+        : personasMedia.toStringAsFixed(1);
       
       mesesUI.add(
         Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            title: Text(labelMes, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${dias}D, ${horasTotales.toStringAsFixed(0)}h, ${personasMedia}p", style: const TextStyle(color: Colors.grey)),
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -3), // Reduce la altura vertical al mínimo
+            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+            // Ponemos fecha y resumen en la misma línea
+            title: Row(
+              children: [
+                Text(
+                  labelMes, 
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "${dias}D, ${horasTotales.toStringAsFixed(0)}h, ${personasStr}p",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AgriPalette.greyMain),
+                ),
+              ],
+            ),
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                 child: _construirCalendarioMensual(mesActual.year, mesActual.month, jornadasMes),
               )
             ],
@@ -599,14 +636,27 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
                   itemCount: jornadasDia.length,
                   itemBuilder: (context, index) {
                     final j = jornadasDia[index];
-                    final tId = j['ktrabajador'];
+                    // Normalizamos el ID de la jornada a minúsculas y sin espacios
+                    final String tId = (j['ktrabajador'] ?? '').toString().trim().toLowerCase();
+                    //final tId = j['ktrabajador'];
                     
                     // Cruzamos con el maestro de trabajadores para obtener el nombre
-                    final trabajador = widget.trabajador.firstWhere(
-                      (t) => t.ktrabajador == tId, 
-                      orElse: () => Trabajador(ktrabajador: '', nombreStr: 'Desconocido', kagricultor: '', eliminadoBit: 0, fechaDtm: DateTime.now())
+                    // final trabajador = widget.trabajador.firstWhere(
+                    //   (t) => t.ktrabajador == tId, 
+                    //   orElse: () => Trabajador(ktrabajador: '', nombreStr: 'Desconocido', kagricultor: '', eliminadoBit: 0, fechaDtm: DateTime.now())
+                    // );
+                    // Buscamos en _trabajadores comparando en minúsculas
+                    final trabajador = _trabajadores.firstWhere(
+                      (t) => t.ktrabajador.trim().toLowerCase() == tId, 
+                      orElse: () => Trabajador(
+                        ktrabajador: '', 
+                        nombreStr: 'Desconocido', 
+                        kagricultor: '', 
+                        eliminadoBit: 0, 
+                        fechaDtm: DateTime.now()
+                      )
                     );
-                    
+
                     final horas = j['horas_flt']?.toString() ?? '0';
                     final obs = j['observaciones_str']?.toString() ?? '';
                     

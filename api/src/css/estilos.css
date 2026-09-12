@@ -1,0 +1,140 @@
+:root {
+    --agri-green: #375D37;
+    --agri-green-accent: #A4C639;
+    --agri-grey: #9E9E9E;
+    --agri-bg: #F5F5F5;
+    --agri-border: #E0E0E0;
+    --agri-error: #D32F2F;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--agri-bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+/* Tarjeta centrada y contenida (no se estirará a pantalla completa) */
+.login-container {
+    background-color: #ffffff;
+    padding: 32px 24px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* Blindaje de tamaño del icono: jamás medirá más de 70px */
+.logo-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.logo-img {
+    width: 70px !important;
+    height: 70px !important;
+    max-width: 70px !important;
+    max-height: 70px !important;
+    object-fit: contain;
+}
+
+/* Tipografía idéntica a Flutter */
+.brand-title {
+    font-family: 'Lato', sans-serif;
+    font-size: 30px;
+    font-weight: 900;
+    color: var(--agri-grey);
+    margin: 0 0 2px 0;
+    line-height: 1;
+}
+
+.brand-title span {
+    color: var(--agri-green-accent);
+}
+
+.subtitle {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--agri-green);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 22px 0;
+}
+
+/* Inputs con halo verde */
+.input-group {
+    margin-bottom: 14px;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    font-size: 12px;
+    color: #666666;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--agri-border);
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+}
+
+.input-group input:not([readonly]):focus {
+    border-color: var(--agri-green);
+    box-shadow: 0 0 0 3px rgba(55, 93, 55, 0.15);
+    outline: none;
+}
+
+.input-group input[readonly] {
+    background-color: #f7f9f7;
+    color: #616161;
+}
+
+/* Botón idéntico al de la App */
+.btn-submit {
+    background-color: var(--agri-green);
+    color: #ffffff;
+    border: none;
+    height: 48px;
+    width: 100%;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    margin-top: 8px;
+    box-shadow: 0 3px 6px rgba(55, 93, 55, 0.2);
+}
+
+.btn-submit:active {
+    background-color: #2b482b;
+}
+
+.btn-submit:disabled {
+    background-color: var(--agri-grey);
+    cursor: not-allowed;
+}
+
+#mensaje {
+    margin-bottom: 15px;
+    font-size: 14px;
+    font-weight: bold;
+}
+.success { color: var(--agri-green); }
+.error { color: var(--agri-error); }

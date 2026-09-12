@@ -12,6 +12,7 @@ $esExito = false;
 // Leer los parámetros (vienen por GET en la URL o por POST al enviar el formulario)
 $finca = $_GET['finca'] ?? ($_POST['finca'] ?? '');
 $dni = $_GET['dni'] ?? ($_POST['dni'] ?? '');
+$comentario = $_GET['comentario'] ?? ($_POST['comentario'] ?? '');
 
 // Procesar el formulario cuando el trabajador pulsa el botón
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -61,12 +62,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // 4. Insertar el Marcaje (fechamarcaje_dtm se autogenera)
-            $stmtInsert = $conn->prepare("INSERT INTO tblmarcaje (kmarcaje, kagricultor, ktrabajador, tipodemarcaje_str, latitud_dec, longitud_dec) VALUES (UUID(), ?, ?, 'Web', ?, ?)");
-            // Enlazar doubles (d) para lat y lon
-            $stmtInsert->bind_param("ssdd", $kagricultor, $ktrabajador, $lat, $lon);
+
+            if (strlen($comentario) < 3) {
+                $stmtInsert = $conn->prepare("INSERT INTO tblmarcaje (kmarcaje, kagricultor, ktrabajador, tipodemarcaje_str, latitud_dec, longitud_dec) VALUES (UUID(), ?, ?, 'Web', ?, ?)");
+                $stmtInsert->bind_param("ssdd", $kagricultor, $ktrabajador, $lat, $lon);
+            } else {
+                $stmtInsert = $conn->prepare("INSERT INTO tblmarcaje (kmarcaje, kagricultor, ktrabajador, tipodemarcaje_str, latitud_dec, longitud_dec, comentarios_str) VALUES (UUID(), ?, ?, 'Web', ?, ?, ?)");
+                $stmtInsert->bind_param("ssdds", $kagricultor, $ktrabajador, $lat, $lon, $comentario);
+            }
+
             $stmtInsert->execute();
             $stmtInsert->close();
-
+            //$stmtInsert = $conn->prepare("INSERT INTO tblmarcaje (kmarcaje, kagricultor, ktrabajador, tipodemarcaje_str, latitud_dec, longitud_dec, comentario_str) VALUES (UUID(), ?, ?, 'Web', ?, ?, ?)");
+            // Enlazar doubles (d) para lat y lon
+            
             $mensaje = "¡Marcaje registrado correctamente!";
             $esExito = true;
 
@@ -85,28 +94,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fichar - AgriAPP</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-container { background-color: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
-        .logo { font-size: 40px; color: #2E7D32; margin-bottom: 5px; }
-        .title { color: #333; font-size: 18px; margin-bottom: 30px; }
-        .input-group { margin-bottom: 20px; text-align: left; }
-        .input-group label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; font-weight: bold; }
-        .input-group input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 15px; }
-        .input-group input[readonly] { background-color: #f9f9f9; color: #555; }
-        .input-group input:not([readonly]):focus { border-color: #2E7D32; outline: none; }
-        .btn-submit { background-color: #2E7D32; color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        .btn-submit:disabled { background-color: #9e9e9e; cursor: not-allowed; }
-        #mensaje { margin-top: 15px; font-size: 14px; font-weight: bold; }
-        .success { color: #2E7D32; }
-        .error { color: #d32f2f; }
-    </style>
+    <!-- FUENTES OFICIALES DE AGRIAPP -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@700;900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="src/css/estilos.css">
 </head>
 <body>
 
 <div class="login-container">
-    <div class="logo">🌿</div>
-    <div class="title">Registro de Jornada</div>
+<!-- Contenedor del Logo integrado -->
+<!-- Icono limpio sin marco forzado -->
+    <div class="logo-wrapper">
+        <img src="src/images/icontransparent.png" alt="AgriAPP" class="logo-img">
+    </div>
+
+    <!-- Título y subtítulo -->
+    <div class="brand-title">Agri<span>APP</span></div>
+    <div class="subtitle">Registro de Jornada</div>
 
     <?php if ($mensaje): ?>
         <div id="mensaje" class="<?= $esExito ? 'success' : 'error' ?>"><?= htmlspecialchars($mensaje) ?></div>
@@ -130,6 +136,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="password" id="password" name="password" placeholder="Introduce tu contraseña" required <?= $esExito ? 'disabled' : '' ?>>
         </div>
 
+        <div class="input-group">
+            <label>Comentario</label>
+            <input type="text" name="comentario" value="<?= htmlspecialchars($comentario) ?>">
+        </div>
+
         <!-- Campos ocultos para el GPS -->
         <input type="hidden" id="lat" name="lat">
         <input type="hidden" id="lon" name="lon">
@@ -140,33 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 </div>
 
-<script>
-    const form = document.getElementById('marcajeForm');
-    const btnFichar = document.getElementById('btnFichar');
-
-    form.addEventListener('submit', function(e) {
-        // Pausamos el envío para capturar el GPS primero
-        e.preventDefault();
-        btnFichar.disabled = true;
-        btnFichar.innerText = 'Obteniendo ubicación...';
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    document.getElementById('lat').value = position.coords.latitude;
-                    document.getElementById('lon').value = position.coords.longitude;
-                    form.submit(); // GPS obtenido, enviamos a PHP
-                },
-                (error) => {
-                    // Si el usuario deniega el GPS, enviamos el formulario igualmente sin coordenadas
-                    form.submit();
-                }
-            );
-        } else {
-            form.submit(); // Navegador sin soporte GPS
-        }
-    });
-</script>
+<script src="src/js/marcaje.js" defer></script>
 
 </body>
 </html>
