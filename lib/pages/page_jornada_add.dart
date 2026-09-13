@@ -71,56 +71,104 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
   }
 
   // Consulta los marcajes existentes en la fecha seleccionada y genera el resumen HH:mm
-  Future<void> _cargarMarcajesDelDia() async {
+Future<void> _cargarMarcajesDelDia() async {
     final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
     try {
       final raw = await _apiService.fetchList('tblmarcaje');
-      print("DEBUG MARCAJES: Descargados ${raw.length} registros de tblmarcaje");
+      print("🔍 DEBUG MARCAJES: Recibidos ${raw.length} registros en total de tblmarcaje");
 
-      final DateFormat horaFormat = DateFormat('HH:mm');
-      final Map<String, List<DateTime>> grupos = {};
+      final Map<String, List<String>> gruposHoras = {};
 
       for (var m in raw) {
-        // 1. Detectamos la columna de fecha (fechamarcaje_dtm o fecha_dtm)
-        final rawFecha = (m['fechamarcaje_dtm'] ?? m['fecha_dtm'] ?? m['fechahora_dtm'] ?? '').toString().trim();
+        final rawFecha = (m['fechamarcaje_dtm'] ?? m['fecha_dtm'] ?? '').toString().trim();
         final bool esEliminado = m['eliminado_bit'] == 1 || m['eliminado_bit'] == true || m['eliminado_bit'] == '1';
 
-        if (rawFecha.isEmpty || esEliminado) continue;
-
-        // 2. Normalizamos fecha y hora (reemplazando espacio por T para parseo ISO seguro)
-        final dt = DateTime.tryParse(rawFecha.replaceFirst(' ', 'T'));
-        final bool coincideFecha = rawFecha.startsWith(fechaStr) ||
-            (dt != null && dt.year == _fechaSeleccionada.year && dt.month == _fechaSeleccionada.month && dt.day == _fechaSeleccionada.day);
-
-        if (coincideFecha && dt != null) {
-          // 3. Normalizamos el UUID del trabajador a minúsculas y sin espacios
+        // Verificamos si es del día seleccionado y no está borrado
+        if (rawFecha.startsWith(fechaStr) && !esEliminado) {
           final kId = (m['ktrabajador'] ?? '').toString().trim().toLowerCase();
-          if (kId.isNotEmpty) {
-            grupos.putIfAbsent(kId, () => []).add(dt);
+          
+          // Extraemos directamente HH:mm (ej: de "2026-09-13 10:44:15" saca "10:44")
+          String horaMinuto = "";
+          if (rawFecha.length >= 16) {
+            horaMinuto = rawFecha.substring(11, 16);
+          } else {
+            final dt = DateTime.tryParse(rawFecha.replaceFirst(' ', 'T'));
+            if (dt != null) horaMinuto = DateFormat('HH:mm').format(dt);
+          }
+
+          if (kId.isNotEmpty && horaMinuto.isNotEmpty) {
+            gruposHoras.putIfAbsent(kId, () => []).add(horaMinuto);
           }
         }
       }
 
       _marcajesPorTrabajador.clear();
-      for (var entry in grupos.entries) {
-        // Ordenamos las horas de entrada/salida cronológicamente
-        entry.value.sort((a, b) => a.compareTo(b));
-
+      for (var entry in gruposHoras.entries) {
+        entry.value.sort(); // Orden cronológico de horas
         if (entry.value.length == 1) {
-          _marcajesPorTrabajador[entry.key] = horaFormat.format(entry.value.first);
+          _marcajesPorTrabajador[entry.key] = entry.value.first;
         } else if (entry.value.length >= 2) {
-          // Si tiene 2 o más, muestra entrada y salida (o todos separados por guion)
-          _marcajesPorTrabajador[entry.key] = entry.value.map((d) => horaFormat.format(d)).join('-');
+          _marcajesPorTrabajador[entry.key] = "${entry.value.first}-${entry.value.last}";
         }
       }
 
-      print("DEBUG MARCAJES PROCESADOS: $_marcajesPorTrabajador");
+      print("🔍 DEBUG MARCAJES DEL DÍA ($fechaStr): $_marcajesPorTrabajador");
       if (mounted) setState(() {});
     } catch (e) {
-      print("Error cargando marcajes del día: $e");
+      print("❌ Error cargando marcajes del día: $e");
     }
   }
+
   // Future<void> _cargarMarcajesDelDia() async {
+  //   final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
+  //   try {
+  //     final raw = await _apiService.fetchList('tblmarcaje');
+  //     print("DEBUG MARCAJES: Descargados ${raw.length} registros de tblmarcaje");
+
+  //     final DateFormat horaFormat = DateFormat('HH:mm');
+  //     final Map<String, List<DateTime>> grupos = {};
+
+  //     for (var m in raw) {
+  //       // 1. Detectamos la columna de fecha (fechamarcaje_dtm o fecha_dtm)
+  //       final rawFecha = (m['fechamarcaje_dtm'] ?? m['fecha_dtm'] ?? m['fechahora_dtm'] ?? '').toString().trim();
+  //       final bool esEliminado = m['eliminado_bit'] == 1 || m['eliminado_bit'] == true || m['eliminado_bit'] == '1';
+
+  //       if (rawFecha.isEmpty || esEliminado) continue;
+
+  //       // 2. Normalizamos fecha y hora (reemplazando espacio por T para parseo ISO seguro)
+  //       final dt = DateTime.tryParse(rawFecha.replaceFirst(' ', 'T'));
+  //       final bool coincideFecha = rawFecha.startsWith(fechaStr) ||
+  //           (dt != null && dt.year == _fechaSeleccionada.year && dt.month == _fechaSeleccionada.month && dt.day == _fechaSeleccionada.day);
+
+  //       if (coincideFecha && dt != null) {
+  //         // 3. Normalizamos el UUID del trabajador a minúsculas y sin espacios
+  //         final kId = (m['ktrabajador'] ?? '').toString().trim().toLowerCase();
+  //         if (kId.isNotEmpty) {
+  //           grupos.putIfAbsent(kId, () => []).add(dt);
+  //         }
+  //       }
+  //     }
+
+  //     _marcajesPorTrabajador.clear();
+  //     for (var entry in grupos.entries) {
+  //       // Ordenamos las horas de entrada/salida cronológicamente
+  //       entry.value.sort((a, b) => a.compareTo(b));
+
+  //       if (entry.value.length == 1) {
+  //         _marcajesPorTrabajador[entry.key] = horaFormat.format(entry.value.first);
+  //       } else if (entry.value.length >= 2) {
+  //         // Si tiene 2 o más, muestra entrada y salida (o todos separados por guion)
+  //         _marcajesPorTrabajador[entry.key] = entry.value.map((d) => horaFormat.format(d)).join('-');
+  //       }
+  //     }
+
+  //     print("DEBUG MARCAJES PROCESADOS: $_marcajesPorTrabajador");
+  //     if (mounted) setState(() {});
+  //   } catch (e) {
+  //     print("Error cargando marcajes del día: $e");
+  //   }
+  // }
+  // // Future<void> _cargarMarcajesDelDia() async {
   //   final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
   //   try {
   //     final raw = await _apiService.fetchList('tblmarcaje');
@@ -457,6 +505,37 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                             // ),
                             
                             // NOMBRE DEL TRABAJADOR Y MARCAJE
+                            // Expanded(
+                            //   child: Column(
+                            //     crossAxisAlignment: CrossAxisAlignment.start,
+                            //     mainAxisSize: MainAxisSize.min,
+                            //     children: [
+                            //       Text(
+                            //         t.nombreStr,
+                            //         maxLines: 1,
+                            //         overflow: TextOverflow.ellipsis,
+                            //         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            //       ),
+                            //       if (marcajeRef != null && marcajeRef.isNotEmpty) ...[
+                            //         const SizedBox(height: 2),
+                            //         Row(
+                            //           children: [
+                            //             const Icon(Icons.schedule, size: 12, color: AgriPalette.greenMain),
+                            //             const SizedBox(width: 4),
+                            //             Text(
+                            //               marcajeRef,
+                            //               style: const TextStyle(
+                            //                 fontSize: 11,
+                            //                 fontWeight: FontWeight.bold,
+                            //                 color: AgriPalette.greenMain,
+                            //               ),
+                            //             ),
+                            //           ],
+                            //         ),
+                            //       ],
+                            //     ],
+                            //   ),
+                            // ),                            
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,26 +547,28 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                   ),
-                                  if (marcajeRef != null && marcajeRef.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.schedule, size: 12, color: AgriPalette.greenMain),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          marcajeRef,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: AgriPalette.greenMain,
+                                  if (marcajeRef != null && marcajeRef.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2.0),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.schedule, size: 12, color: theme.primaryColor),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            marcajeRef,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: theme.primaryColor,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ],
                                 ],
                               ),
-                            ),                            
+                            ),
                             // CAMPOS COMPACTOS (SOLO VISIBLES SI ESTÁ MARCADO)
                             if (seleccionado) ...[
                               const SizedBox(width: 4),

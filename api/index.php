@@ -1152,7 +1152,7 @@ $app->get('/api/listar/{tabla}', function (Request $request, Response $response,
     $jwt = $request->getAttribute('jwt');
     $kagricultor = $jwt->sub;
 
-        $tablasPermitidas = ['tblagricultores','tblalbaran','tblalbarandetalle','tblalmacen','tblaltatrabajador','tblArchivos','tblfinca','tblfincagastos','tbljornada','tblnota','tbloperacion','tbltrabajador']; // etc.
+        $tablasPermitidas = ['tblagricultores','tblalbaran','tblalbarandetalle','tblalmacen','tblaltatrabajador','tblArchivos','tblfinca','tblfincagastos','tbljornada','tblnota','tbloperacion','tbltrabajador','tblmarcaje']; // etc.
         if (!in_array($args['tabla'], $tablasPermitidas)) {
                 return jsonResponse($response, ["error" => "Tabla no permitida"], 403);
         }
