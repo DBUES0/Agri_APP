@@ -77,18 +77,32 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
                 mensajeEmergente(context, 'Las contraseñas no coinciden o están vacías', tipo: 'error');
                 return;
               }
-
               try {
-                // Guardamos la contraseña en la tabla tbltrabajador
-                await _apiService.putGeneric('tbltrabajador', t.ktrabajador, {
-                  'password_str': pass1Controller.text.trim()
-                });
+                // 1. Obtenemos todos los datos actuales del trabajador
+                final payload = t.toJson();
+                // 2. Modificamos solo la contraseña
+                payload['password_str'] = pass1Controller.text.trim();
+
+                // 3. Enviamos el objeto completo para que PHP no ponga el resto a NULL
+                await _apiService.putGeneric('tbltrabajador', t.ktrabajador, payload);
+                
                 if (!mounted) return;
                 Navigator.pop(context);
                 mensajeEmergente(context, 'Contraseña guardada correctamente', tipo: 'success');
               } catch (e) {
                 mensajeEmergente(context, 'Error al guardar contraseña: $e', tipo: 'error');
               }
+              // try {
+              //   // Guardamos la contraseña en la tabla tbltrabajador
+              //   await _apiService.putGeneric('tbltrabajador', t.ktrabajador, {
+              //     'password_str': pass1Controller.text.trim()
+              //   });
+              //   if (!mounted) return;
+              //   Navigator.pop(context);
+              //   mensajeEmergente(context, 'Contraseña guardada correctamente', tipo: 'success');
+              // } catch (e) {
+              //   mensajeEmergente(context, 'Error al guardar contraseña: $e', tipo: 'error');
+              // }
             },
             child: const Text('Guardar', style: TextStyle(color: Colors.white)),
           ),

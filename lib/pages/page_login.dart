@@ -155,7 +155,123 @@ Future<void> _abrirUrl(String url) async {
     );
   }
 
-  Future<void> _login() async {
+  // Future<void> _login() async {
+  //   setState(() {
+  //     _error = '';
+  //     _isLoading = true; 
+  //   });
+
+  //   try {
+  //     final response = await _apiService.postLogin(
+  //       _emailController.text.trim(),
+  //       _passwordController.text,
+  //     );
+
+  //     final String token = response['token'];
+  //     final Map<String, dynamic>? userData = response['usuario'];
+
+  //     if (userData == null) {
+  //       throw 'El servidor no devolvió los datos del usuario (clave "usuario" no encontrada).';
+  //     }
+
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.setString('token', token);
+  //     await prefs.setString('usuario_json', jsonEncode(userData));
+
+  //     await DBService.instance.limpiarTodaLaBaseDeDatos();
+
+  //     final usuario = Usuario.fromJson(userData);
+      
+  //     final fincas = (await _apiService.fetchListV('vfincas'))
+  //         .map((json) => finca.fromJson(json)).toList();
+
+  //     String idReal = usuario.kagricultor;
+  //     if (idReal.isEmpty && fincas.isNotEmpty) {
+  //        idReal = fincas.first.kagricultor;
+  //     }
+      
+  //     final usuarioCorregido = Usuario(
+  //       kagricultor: idReal,
+  //       nombre: usuario.nombre,
+  //       apellidos: usuario.apellidos,
+  //       dni: usuario.dni,
+  //       direccion: usuario.direccion,
+  //       email: usuario.email,
+  //       telefono: usuario.telefono,
+  //       validado: usuario.validado,
+  //       bloqueado: usuario.bloqueado,
+  //       intentos: usuario.intentos,
+  //       ultimoIntento: usuario.ultimoIntento,
+  //       tipoUsuario: usuario.tipoUsuario,
+  //       prefAgrupacion: usuario.prefAgrupacion,
+  //       prefAgrupacionGastos: usuario.prefAgrupacionGastos,
+  //     );
+      
+  //     final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
+  //         .map((json) => Almacen.fromJson(json)).toList();
+          
+  //     final productos = (await _apiService.fetchList('tblproducto', isComun: true))
+  //         .map((json) => Producto.fromJson(json)).toList();
+          
+  //     final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
+  //         .map((json) => Tipogasto.fromJson(json)).toList();
+
+  //     final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
+  //         .map((json) => Tipodeprecio.fromJson(json)).toList();
+
+  //     final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
+  //         .map((json) => Tipooperacion.fromJson(json)).toList();
+
+  //     final trabajadores = (await _apiService.fetchList('tbltrabajador'))
+  //         .map((json) => Trabajador.fromJson(json)).toList();
+
+  //     final albaranes = (await _apiService.fetchParticular('albaranesv2'))
+  //         .map((json) => Albaran.fromJson(json)).toList();
+
+  //     if (!mounted) return;
+
+  //     TextInput.finishAutofillContext();
+      
+  //     // 6. Navegamos pasando los datos DIRECTAMENTE AL DASHBOARD
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(
+  //         builder: (context) => DashboardPage(
+  //           usuario: usuarioCorregido, 
+  //           fincas: fincas,
+  //           tiposGasto: tiposGasto,
+  //           almacen: almacenes,
+  //           producto: productos,
+  //           tipodeprecio: tiposPrecio,
+  //           tipooperacion: operaciones,
+  //           trabajador: trabajadores,
+  //           albaranes: albaranes,
+  //         ),
+  //       ),
+  //     );
+  //   // } catch (e) {
+  //   //   setState(() {
+  //   //     _error = 'Error al entrar: $e';
+  //   //   });
+  //   // } finally {
+  //   //   setState(() {
+  //   //     _isLoading = false; 
+  //   //   });
+  //   // }
+  //   } catch (e, stacktrace) { // <--- AÑADE EL stacktrace AQUÍ
+      
+  //     // 1. Esto te dirá LA LÍNEA EXACTA del archivo donde crashea (ej: usuario.dart:45)
+  //     print("🛑 TRAZA DEL ERROR:");
+  //     print(stacktrace); 
+      
+  //     setState(() {
+  //       // Tu variable de mensaje de error (la que pinta el texto rojo)
+  //       _error = "Error al entrar: $e"; 
+  //     });
+  //   }
+  // }
+
+Future<void> _login() async {
     setState(() {
       _error = '';
       _isLoading = true; 
@@ -167,11 +283,18 @@ Future<void> _abrirUrl(String url) async {
         _passwordController.text,
       );
 
-      final String token = response['token'];
-      final Map<String, dynamic>? userData = response['usuario'];
+      // 1. EL SALVAVIDAS: Comprobamos si hay error o si no hay token
+      if (response.containsKey('error') || response['token'] == null) {
+        // Lanzamos el error hacia el bloque 'catch' de abajo
+        throw response['error'] ?? response['mensaje'] ?? 'Usuario o contraseña incorrectos';
+      }
 
-      if (userData == null) {
-        throw 'El servidor no devolvió los datos del usuario (clave "usuario" no encontrada).';
+      // 2. Si el código llega aquí, el login fue un éxito y el token existe
+      final String token = response['token'];
+      final Map<String, dynamic> userData = response['usuario'];
+
+      if (userData.isEmpty) {
+        throw 'El servidor no devolvió los datos del usuario.';
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -232,7 +355,7 @@ Future<void> _abrirUrl(String url) async {
 
       TextInput.finishAutofillContext();
       
-      // 6. Navegamos pasando los datos DIRECTAMENTE AL DASHBOARD
+      // Navegamos al Dashboard
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -249,17 +372,20 @@ Future<void> _abrirUrl(String url) async {
           ),
         ),
       );
-    } catch (e) {
+    } catch (e, stacktrace) { 
+      print("🛑 TRAZA DEL ERROR:");
+      print(stacktrace); 
+      
       setState(() {
-        _error = 'Error al entrar: $e';
-      });
-    } finally {
-      setState(() {
+        // Mostramos el texto correctamente en rojo
+        _error = "Error al entrar: $e"; 
+        
+        // ¡IMPORTANTE! Apagamos el círculo de carga
         _isLoading = false; 
       });
     }
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(

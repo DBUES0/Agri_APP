@@ -89,10 +89,10 @@ class Trabajador {
     return Trabajador(
       ktrabajador: json['ktrabajador'] ?? '',
       kagricultor: json['kagricultor'] ?? '',
-      nombreStr: json['nombre_str'] ?? 'Sin nombre',
-      dniStr: json['dni_str'],
-      telefonoStr: json['telefono_str'],
-      emailStr: json['email_str'],
+      nombreStr: json['nombre_str']?.toString() ?? 'Sin nombre',
+      dniStr: json['dni_str']?.toString() ?? '',
+      telefonoStr: json['telefono_str']?.toString(),
+      emailStr: json['email_str']?.toString(),
       // Parsea el eliminado de forma segura
       eliminadoBit: int.tryParse(json['eliminado_bit']?.toString() ?? '0') ?? 0,
       fechaeliminacionDtm: json['fechaeliminacion_dtm'] != null ? DateTime.tryParse(json['fechaeliminacion_dtm']) : null,
