@@ -1,4 +1,3 @@
-//page_albaran.dart
 import 'package:agriapp/services/db_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -22,10 +21,6 @@ class PageAlbaran extends StatefulWidget {
   final List<Producto> productos;    
   final List<finca> fincas;          
   final List<Albaran> albaranesTotales;
-  
-  // --- PUNTO 1: CONFIGURACIÓN DEL DISCRIMINADOR ---
-  // Añadimos este parámetro opcional. Por defecto es el UUID de ALBARÁN,
-  // así cuando lo llames desde Gastos solo tendrás que pasarle el UUID de GASTO.
   final String ktipoalbaran;
 
   const PageAlbaran({
@@ -36,7 +31,7 @@ class PageAlbaran extends StatefulWidget {
     required this.productos,
     required this.fincas,
     required this.albaranesTotales, 
-    this.ktipoalbaran = "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df", // Por defecto ALBARAN
+    this.ktipoalbaran = "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df", // Por defecto ALBARAN (Ingreso)
   }) : super(key: key);
 
   @override
@@ -47,35 +42,37 @@ class _PageAlbaranState extends State<PageAlbaran> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
 
-  late DateTime _fecha;               
-  String? _selectedAlmacen;           
+  static const String _uuidGasto = "c4755f6d-6744-11f0-ac9b-e2b6c6b4d8df";
+  static const String _kProductoGenericoGasto = "f84a0c63-e757-49e6-87c5-3097cdfd813a";
+
+  late DateTime _fecha;                
+  String? _selectedAlmacen;            
   String? _selectedTipoPrecio;        
   String? _selectedProducto;
   
-  // Variable interna que recordará el tipo de documento durante la sesión
   late String _currentTipoAlbaran;
 
   final TextEditingController _idAlbaranAlmacenController = TextEditingController();
   final TextEditingController _comentarioCabeceraController = TextEditingController();
+  final TextEditingController _totalCabeceraController = TextEditingController(); // CAMPO NUEVO
 
   List<AlbaranDetalle> _detalles = [];
   List<Archivo> _archivos = [];
 
-  final TextEditingController _kgController               = TextEditingController();
-  final TextEditingController _palletsController        = TextEditingController();
-  final TextEditingController _cajasController          = TextEditingController();
+  final TextEditingController _kgController              = TextEditingController();
+  final TextEditingController _palletsController         = TextEditingController();
+  final TextEditingController _cajasController           = TextEditingController();
   final TextEditingController _precioController          = TextEditingController();
-  final TextEditingController _comentarioDetController  = TextEditingController();
+  final TextEditingController _comentarioDetController   = TextEditingController();
   String? _selectedFinca;
+
+  bool get _esGasto => _currentTipoAlbaran == _uuidGasto;
 
   @override
   void initState() {
     super.initState();
     
-    // Asignamos el tipo de documento: Prioriza el del albarán existente (si editamos) 
-    // o el que viene por el constructor (si creamos nuevo).
     _currentTipoAlbaran = widget.albaran?.ktipoalbaran ?? widget.ktipoalbaran;
-
     _fecha = widget.albaran?.fecha ?? DateTime.now();
     _selectedTipoPrecio = widget.albaran?.ktipodeprecio;
     _selectedAlmacen = widget.albaran?.kalmacen;
@@ -84,27 +81,39 @@ class _PageAlbaranState extends State<PageAlbaran> {
       _idAlbaranAlmacenController.text = widget.albaran?.idalbaranstr ?? "";
       _comentarioCabeceraController.text = widget.albaran?.comentarioStr ?? "";
       _detalles = List.from(widget.albaran!.detalles);
-      _archivos = List.from(widget.albaran!.archivos); 
+      _archivos = List.from(widget.albaran!.archivos);
+
+      // Si es un gasto y tiene exactamente una línea genérica, precargamos el total rápido
+      if (_esGasto && _detalles.length == 1 && _detalles.first.kproducto == _kProductoGenericoGasto) {
+        final d = _detalles.first;
+        if (d.precio != null && d.precio! > 0) {
+          _totalCabeceraController.text = d.precio!.toStringAsFixed(2);
+        }
+      }
     } else {
       _selectedAlmacen = _obtenerUltimoAlmacenUsado();
       
-      // Filtramos en caliente los productos del tipo actual para preseleccionar el primero
-     // AÑADE ESTO PARA DEPURAR
-    print("Tipo de Albarán Actual: $_currentTipoAlbaran");
-    print("Total de productos en memoria: ${widget.productos.length}");
-    for(var p in widget.productos) {
-      print("- ${p.productoStr}: ${p.ktipoalbaran}");
-    }
-
-    final productosFiltrados = widget.productos
-      .where((p) => p.ktipoalbaran == _currentTipoAlbaran)
-      .toList();
-      
-    print("Productos Filtrados: ${productosFiltrados.length}");
+      final productosFiltrados = widget.productos
+        .where((p) => p.ktipoalbaran == _currentTipoAlbaran)
+        .toList();
+        
       if (productosFiltrados.isNotEmpty) {
         _selectedProducto = productosFiltrados[0].kproducto;
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _idAlbaranAlmacenController.dispose();
+    _comentarioCabeceraController.dispose();
+    _totalCabeceraController.dispose();
+    _kgController.dispose();
+    _palletsController.dispose();
+    _cajasController.dispose();
+    _precioController.dispose();
+    _comentarioDetController.dispose();
+    super.dispose();
   }
 
   String? _obtenerUltimoAlmacenUsado() {
@@ -112,7 +121,6 @@ class _PageAlbaranState extends State<PageAlbaran> {
     List<Albaran> temporales = List.from(widget.albaranesTotales);
     temporales.sort((a, b) => b.fecha.compareTo(a.fecha));
     
-    // Buscamos el último almacén usado que coincida con el tipo de documento actual
     try {
       return temporales.firstWhere((element) => element.ktipoalbaran == _currentTipoAlbaran).kalmacen;
     } catch (_) {
@@ -123,9 +131,41 @@ class _PageAlbaranState extends State<PageAlbaran> {
   Future<void> _guardarAlbaran() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final detallesActivos = _detalles.where((d) => d.eliminado == 0).toList();
+    List<AlbaranDetalle> detallesActivos = _detalles.where((d) => d.eliminado == 0).toList();
+    final double? totalRapido = double.tryParse(_totalCabeceraController.text.replaceAll(',', '.'));
+
+    // LÓGICA DE GUARDADO AUTOMÁTICO PARA GASTOS SIN LÍNEAS
+    if (detallesActivos.isEmpty && _esGasto && totalRapido != null && totalRapido > 0) {
+      if (widget.fincas.isEmpty) {
+        mensajeEmergente(context, 'No se puede guardar el gasto porque no hay ninguna finca registrada.', tipo: 'error');
+        return;
+      }
+
+      final fincaDefecto = widget.fincas.first;
+
+      final lineaGenerica = AlbaranDetalle(
+        kalbarandetalle: const Uuid().v4(),
+        kalbaran: widget.albaran?.kalbaran ?? '',
+        kfinca: fincaDefecto.kfinca,
+        linea: 1,
+        kg: 1.0, // 1 Unidad por defecto
+        pallets: 0,
+        cajas: 0,
+        precio: totalRapido,
+        kproducto: _kProductoGenericoGasto,
+        comentario: _comentarioCabeceraController.text.trim(),
+        eliminado: 0,
+        kagricultor: fincaDefecto.kagricultor,
+      );
+
+      _detalles.add(lineaGenerica);
+      detallesActivos = [lineaGenerica];
+    }
+
     if (detallesActivos.isEmpty) {
-      mensajeEmergente(context, 'Debe añadir al menos un producto.');
+      mensajeEmergente(context, _esGasto 
+        ? 'Indique un importe total en cabecera o añada al menos una línea de gasto.'
+        : 'Debe añadir al menos un producto.');
       return;
     }
 
@@ -172,10 +212,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
         'ktipodeprecio': _selectedTipoPrecio,
         'comentario_str': _comentarioCabeceraController.text,
         'idalbaran_str': _idAlbaranAlmacenController.text, 
-        
-        // --- PUNTO 2: DINÁMICO AL GUARDAR ---
         'ktipoalbaran': _currentTipoAlbaran, 
-        
         'eliminado_bit': 0,
         'fechaeliminacion_dtm': null, 
         'fechadesde_dtm': _fecha.toIso8601String(), 
@@ -184,8 +221,6 @@ class _PageAlbaranState extends State<PageAlbaran> {
         'detalles': listaDetalles,
         'archivos': listaArchivos,
       };
-      
-      print("DOCUMENTO ENVIADO A LA COLA LOCAL: $albaranCompleto");
 
       DBService.instance.registrarPendiente(entidad: 'albaran', datos: albaranCompleto);
 
@@ -203,8 +238,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
       mensajeEmergente(context, 'Guardado con éxito');
 
     } catch (e) {
-        print("ERROR AL GUARDAR: ${e.toString()}");
-        mensajeEmergente(context, 'Error al guardar: $e');
+      mensajeEmergente(context, 'Error al guardar: $e');
     }
   }
 
@@ -259,7 +293,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
                         'No hay archivos adjuntos',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontStyle: FontStyle.italic,
-                          color: AgriPalette.greyMain,
+                          color: AgriPalette.greyMain, 
                         ),
                       ),
                     ),
@@ -368,7 +402,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
           nombrearchivo: name,
           fecha: DateTime.now(),
           formato: extension.toUpperCase(),
-          tipo: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" ? 'ALBARAN' : 'GASTO',
+          tipo: _esGasto ? 'GASTO' : 'ALBARAN',
           rutacompleta: nuevoPath, 
           orden: _archivos.length + 1, 
         ));
@@ -392,7 +426,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
         final response = await _apiService.uploadFile(
           filePath: filePath,
           kuuid: newUuid,
-          tipo: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" ? 'ALBARAN' : 'GASTO',
+          tipo: _esGasto ? 'GASTO' : 'ALBARAN',
         );
 
         setState(() {
@@ -400,11 +434,11 @@ class _PageAlbaranState extends State<PageAlbaran> {
             karchivos: response['uuid'], 
             kagricultor: '', 
             kuuid: newUuid,
-            orden: _archivos.length + 1,
+            orden: _archivos.length + 1, 
             fecha: DateTime.now(),
             formato: fileName.split('.').last, 
             nombrearchivo: fileName,
-            tipo: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" ? 'ALBARAN' : 'GASTO',
+            tipo: _esGasto ? 'GASTO' : 'ALBARAN',
             rutacompleta: null,
             campo1: null,
             sizemb: null,
@@ -419,22 +453,10 @@ class _PageAlbaranState extends State<PageAlbaran> {
     }
   }
 
-  // --- PUNTO 3: FILTRADO INTELIGENTE DE PRODUCTOS EN EL DIÁLOGO ---
   void _mostrarDialogoDetalle({AlbaranDetalle? detalle}) {
-    
-    // Filtramos la lista de productos en caliente basándonos en el tipo de documento activo
-    // AÑADE ESTO PARA DEPURAR
-    print("Tipo de Albarán Actual: $_currentTipoAlbaran");
-    print("Total de productos en memoria: ${widget.productos.length}");
-    for(var p in widget.productos) {
-      print("- ${p.productoStr}: ${p.ktipoalbaran}");
-    }
-
     final productosFiltrados = widget.productos
       .where((p) => p.ktipoalbaran == _currentTipoAlbaran)
       .toList();
-      
-    print("Productos Filtrados: ${productosFiltrados.length}");
 
     if (detalle != null) {
       _selectedFinca = detalle.kfinca;
@@ -445,7 +467,8 @@ class _PageAlbaranState extends State<PageAlbaran> {
       _precioController.text = detalle.precio?.toString() ?? '';
       _comentarioDetController.text = detalle.comentario ?? '';
     } else {
-      _kgController.clear(); 
+      // VALOR POR DEFECTO PARA GASTOS: Cantidad a 1
+      _kgController.text = _esGasto ? '1' : ''; 
       _palletsController.clear();
       _cajasController.clear(); 
       _precioController.clear();
@@ -460,7 +483,6 @@ class _PageAlbaranState extends State<PageAlbaran> {
       }
     }
 
-    // AÑADE ESTE SALVAVIDAS AQUÍ (Justo antes de showDialog):
     if (_selectedFinca != null && !widget.fincas.any((f) => f.kfinca == _selectedFinca)) {
       _selectedFinca = null;
     }
@@ -493,11 +515,10 @@ class _PageAlbaranState extends State<PageAlbaran> {
                       ),
                       const SizedBox(height: 10),
 
-                      // El Dropdown consume la lista limpia según el documento
                       DropdownButtonFormField<String>(
                         value: _selectedProducto,
                         decoration: InputDecoration(
-                          labelText: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" 
+                          labelText: !_esGasto 
                               ? 'Producto (Ingreso)' 
                               : 'Concepto (Gasto)'
                         ),
@@ -511,26 +532,30 @@ class _PageAlbaranState extends State<PageAlbaran> {
                       const SizedBox(height: 10),
                       TextField(
                         controller: _kgController, 
-                        decoration: const InputDecoration(labelText: 'Kilos / Cantidad'), 
-                        keyboardType: TextInputType.number
+                        decoration: InputDecoration(labelText: _esGasto ? 'Cantidad / Unidades' : 'Kilos / Cantidad'), 
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _palletsController, 
-                        decoration: const InputDecoration(labelText: 'Pallets'), 
-                        keyboardType: TextInputType.number
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _cajasController, 
-                        decoration: const InputDecoration(labelText: 'Cajas'), 
-                        keyboardType: TextInputType.number
-                      ),
+                      
+                      if (!_esGasto) ...[
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _palletsController, 
+                          decoration: const InputDecoration(labelText: 'Pallets'), 
+                          keyboardType: TextInputType.number
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _cajasController, 
+                          decoration: const InputDecoration(labelText: 'Cajas'), 
+                          keyboardType: TextInputType.number
+                        ),
+                      ],
+
                       const SizedBox(height: 10),
                       TextField(
                         controller: _precioController, 
-                        decoration: const InputDecoration(labelText: 'Precio €'), 
-                        keyboardType: TextInputType.number
+                        decoration: InputDecoration(labelText: _esGasto ? 'Importe (€)' : 'Precio €/kg'), 
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       ),
                       const SizedBox(height: 10),
                       TextField(
@@ -550,37 +575,43 @@ class _PageAlbaranState extends State<PageAlbaran> {
                   onPressed: () {
                     if (_selectedFinca == null || _selectedProducto == null) return;
                     
-                    final nKg = double.tryParse(_kgController.text) ?? 0;
+                    final nKg = double.tryParse(_kgController.text.replaceAll(',', '.')) ?? 0;
                     final nPal = int.tryParse(_palletsController.text) ?? 0;
                     final nCaj = int.tryParse(_cajasController.text) ?? 0;
-                    final nPre = double.tryParse(_precioController.text);
+                    final nPre = double.tryParse(_precioController.text.replaceAll(',', '.'));
 
-                    if (detalle == null) {
-                      _detalles.add(AlbaranDetalle(
-                        kalbarandetalle: '',
-                        kalbaran: widget.albaran?.kalbaran ?? '',
-                        kfinca: _selectedFinca!,
-                        linea: _detalles.length + 1,
-                        kg: nKg, 
-                        pallets: nPal, 
-                        cajas: nCaj, 
-                        precio: nPre,
-                        kproducto: _selectedProducto!,
-                        comentario: _comentarioDetController.text,
-                        eliminado: 0,
-                        kagricultor: widget.fincas.firstWhere((f) => f.kfinca == _selectedFinca).kagricultor,
-                      ));
-                    } else {
-                      detalle.kfinca = _selectedFinca!;
-                      detalle.kproducto = _selectedProducto!;
-                      detalle.kg = nKg; 
-                      detalle.pallets = nPal;
-                      detalle.cajas = nCaj; 
-                      detalle.precio = nPre;
-                      detalle.comentario = _comentarioDetController.text;
-                    }
-                    
-                    setState(() {});
+                    setState(() {
+                      // Vaciamos el total de cabecera si insertamos algo a mano
+                      if (_esGasto) {
+                        _totalCabeceraController.clear();
+                      }
+
+                      if (detalle == null) {
+                        _detalles.add(AlbaranDetalle(
+                          kalbarandetalle: '',
+                          kalbaran: widget.albaran?.kalbaran ?? '',
+                          kfinca: _selectedFinca!,
+                          linea: _detalles.length + 1,
+                          kg: nKg, 
+                          pallets: nPal, 
+                          cajas: nCaj, 
+                          precio: nPre,
+                          kproducto: _selectedProducto!,
+                          comentario: _comentarioDetController.text,
+                          eliminado: 0,
+                          kagricultor: widget.fincas.firstWhere((f) => f.kfinca == _selectedFinca).kagricultor,
+                        ));
+                      } else {
+                        detalle.kfinca = _selectedFinca!;
+                        detalle.kproducto = _selectedProducto!;
+                        detalle.kg = nKg; 
+                        detalle.pallets = nPal; 
+                        detalle.cajas = nCaj; 
+                        detalle.precio = nPre;
+                        detalle.comentario = _comentarioDetController.text;
+                      }
+                    });
+
                     Navigator.pop(context);
                   },
                   child: Text(
@@ -598,24 +629,9 @@ class _PageAlbaranState extends State<PageAlbaran> {
 
   @override
   Widget build(BuildContext context) {
-    // --- PUNTO 4: FILTRADO INTELIGENTE DE ALMACENES EN EL BUILD ---
-    // Añade esto en el build antes de calcular almacenesFiltrados:
-    print("--- DEPURANDO ALMACENES ---");
-    print("Tipo actual buscado: $_currentTipoAlbaran");
-    for (var a in widget.almacenes) {
-      print("Almacén: ${a.nombreStr} | ktipoalbaran en BD: '${a.ktipoalbaran}'");
-    }
-
     final List<Almacen> almacenesFiltrados = widget.almacenes
         .where((a) => a.ktipoalbaran == _currentTipoAlbaran)
         .toList();
-        
-    print("Almacenes tras el filtro: ${almacenesFiltrados.length}");
-
-
-    // final List<Almacen> almacenesFiltrados = widget.almacenes
-    //     .where((a) => a.ktipoalbaran == _currentTipoAlbaran)
-    //     .toList();
 
     if (_selectedAlmacen != null && !almacenesFiltrados.any((a) => a.kalmacen == _selectedAlmacen)) {
       _selectedAlmacen = null;
@@ -625,7 +641,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" 
+        title: Text(!_esGasto 
             ? (widget.albaran == null ? 'Nuevo Albarán' : 'Editar Albarán')
             : (widget.albaran == null ? 'Nuevo Gasto' : 'Editar Gasto')),
         actions: [
@@ -643,9 +659,9 @@ class _PageAlbaranState extends State<PageAlbaran> {
                 child: ListView(
                   children: [
                     ListTile(
-                        title: Text(
-                          'Fecha: ${_fecha.day.toString().padLeft(2, '0')}/${_fecha.month.toString().padLeft(2, '0')}/${_fecha.year}'
-                        ),
+                      title: Text(
+                        'Fecha: ${_fecha.day.toString().padLeft(2, '0')}/${_fecha.month.toString().padLeft(2, '0')}/${_fecha.year}'
+                      ),
                       trailing: const Icon(Icons.calendar_today, color: AgriPalette.greenMain),
                       onTap: () async {
                         final p = await showDatePicker(context: context, initialDate: _fecha, firstDate: DateTime(2020), lastDate: DateTime(2100));
@@ -655,7 +671,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
                     DropdownButtonFormField<String>(
                       value: _selectedAlmacen,
                       decoration: InputDecoration(
-                        labelText: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" 
+                        labelText: !_esGasto 
                             ? 'Almacén de Destino' 
                             : 'Proveedor / Acreedor'
                       ),
@@ -670,7 +686,7 @@ class _PageAlbaranState extends State<PageAlbaran> {
                     TextField(
                       controller: _idAlbaranAlmacenController,
                       decoration: InputDecoration(
-                        labelText: _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" 
+                        labelText: !_esGasto 
                             ? 'Nº Albarán Almacén' 
                             : 'Nº Factura / Justificante'
                       ),
@@ -680,15 +696,47 @@ class _PageAlbaranState extends State<PageAlbaran> {
                       controller: _comentarioCabeceraController,
                       decoration: const InputDecoration(labelText: 'Notas Generales'),
                     ),
+
+                    // --- CAMPO NUEVO: TOTAL (€) SOLO PARA GASTOS ---
+                    if (_esGasto) ...[
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _totalCabeceraController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Total Gasto (€) - Sin desglose de líneas',
+                          hintText: 'Ej. 150.50',
+                          prefixIcon: const Icon(Icons.euro, color: AgriPalette.greenMain),
+                          helperText: visibleItems.isNotEmpty
+                              ? 'Si escribe aquí, se descartarán las líneas manuales al guardar.'
+                              : 'Si rellena este importe, se creará una línea genérica automáticamente.',
+                        ),
+                        onChanged: (valor) {
+                          if (valor.trim().isNotEmpty && visibleItems.isNotEmpty) {
+                            setState(() {
+                              for (var d in _detalles) {
+                                d.eliminado = 1;
+                              }
+                            });
+                          }
+                        },
+                      ),
+                    ],
+
                     const Divider(height: 40),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _currentTipoAlbaran == "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df" ? 'PRODUCTOS' : 'CONCEPTOS DE GASTO', 
+                          !_esGasto ? 'PRODUCTOS' : 'CONCEPTOS DE GASTO', 
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
                         ),
-                        IconButton(icon: const Icon(Icons.add_circle), color: AgriPalette.greenMain, iconSize: 32, onPressed: () => _mostrarDialogoDetalle()),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle), 
+                          color: AgriPalette.greenMain, 
+                          iconSize: 32, 
+                          onPressed: () => _mostrarDialogoDetalle()
+                        ),
                       ],
                     ),
                     ...visibleItems.map((d) {
@@ -697,18 +745,24 @@ class _PageAlbaranState extends State<PageAlbaran> {
                           orElse: () => Producto(
                             kproducto: '', 
                             productoStr: '?', 
-                            fecha: DateTime.now(),
+                            fecha: DateTime.now(), 
                             ktipoalbaran: _currentTipoAlbaran,
                           ),
                         );
                       return Card(
                         child: ListTile(
-                          title: Text('${prod.productoStr} - ${d.kg} unidades'),
-                          subtitle: Text('Pallets: ${d.pallets} | Cajas: ${d.cajas}'),
+                          title: Text('${prod.productoStr} - ${d.kg} ${_esGasto ? 'ud' : 'kg'}'),
+                          subtitle: Text(!_esGasto 
+                              ? 'Pallets: ${d.pallets} | Cajas: ${d.cajas}'
+                              : 'Importe: ${d.precio ?? 0.0} €'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              IconButton(icon: const Icon(Icons.edit), color: AgriPalette.greenMain, onPressed: () => _mostrarDialogoDetalle(detalle: d)),
+                              IconButton(
+                                icon: const Icon(Icons.edit), 
+                                color: AgriPalette.greenMain, 
+                                onPressed: () => _mostrarDialogoDetalle(detalle: d)
+                              ),
                               IconButton(
                                 icon: const Icon(Icons.delete), 
                                 color: AgriPalette.greenMain, 

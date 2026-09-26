@@ -19,6 +19,8 @@ class PageTrabajadorForm extends StatefulWidget {
 }
 
 class _PageTrabajadorFormState extends State<PageTrabajadorForm> {
+  
+
   final _formKey = GlobalKey<FormState>();
   
   // Controladores

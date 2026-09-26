@@ -461,13 +461,18 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
                     icon: const Icon(Icons.add),
                     color: AgriPalette.greenMain,
                     tooltip: 'Añadir Jornada',
-                    onPressed: () {
-                      Navigator.push(
+                    onPressed: () async {
+                      final bool? guardadoOk = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PageJornadaAdd(trabajadores: widget.trabajador),
+                          builder: (context) => PageJornadaAdd(trabajadores: _trabajadores),
                         ),
                       );
+
+                      if (guardadoOk == true) {
+                        // Si se guardó una jornada, refrescamos las jornadas (y opcionalmente trabajadores)
+                        _refreshJornadas(); 
+                      }
                     },
                   ),
                 ],
@@ -616,7 +621,7 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
     );
   }
 
-  void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
+void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
@@ -627,25 +632,76 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Jornada del ${fechaStr.split('-').reversed.join('/')}", style: Theme.of(context).textTheme.titleLarge),
+              // --- CABECERA CON BOTÓN DE EDITAR ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Jornada del ${fechaStr.split('-').reversed.join('/')}", 
+                    style: Theme.of(context).textTheme.titleLarge
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_calendar),
+                    color: AgriPalette.greenMain,
+                    tooltip: 'Editar Jornada',
+                    onPressed: () async {
+                      Navigator.pop(context); // Cierra el panel inferior actual
+                      
+                      final bool? guardadoOk = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PageJornadaAdd(
+                            trabajadores: _trabajadores,
+                            fechaInicial: DateTime.parse(fechaStr), // <-- Fijamos la fecha
+                            jornadasExistentes: jornadasDia,        // <-- Pasamos los datos existentes
+                          ),
+                        ),
+                      );
+
+                      if (guardadoOk == true) {
+                        _refreshJornadas();
+                      }
+                    },
+                  ),
+                  // IconButton(
+                  //   icon: const Icon(Icons.edit_calendar),
+                  //   color: AgriPalette.greenMain,
+                  //   tooltip: 'Editar Jornada',
+                  //   onPressed: () async {
+                  //     // 1. Cerramos el panel inferior actual
+                  //     Navigator.pop(context);
+                      
+                  //     // 2. Abrimos la pantalla de jornadas
+                  //     final bool? guardadoOk = await Navigator.push(
+                  //       context,
+                  //       MaterialPageRoute(
+                  //         builder: (context) => PageJornadaAdd(
+                  //           trabajadores: _trabajadores,
+                  //           // Opcional: Podrías pasarle la fecha para que el calendario se abra en este día exacto
+                  //           // fechaSeleccionada: DateTime.parse(fechaStr),
+                  //         ),
+                  //       ),
+                  //     );
+
+                  //     // 3. Si se guardó algo al editar, recargamos el dashboard
+                  //     if (guardadoOk == true) {
+                  //       _refreshJornadas();
+                  //     }
+                  //   },
+                  // ),
+                ],
+              ),
               const Divider(),
               const SizedBox(height: 8),
-              Flexible( // Flexible evita que ListView reviente la altura del BottomSheet
+              // --- LISTA DE TRABAJADORES ---
+              Flexible( 
                 child: ListView.builder(
                   shrinkWrap: true,
                   itemCount: jornadasDia.length,
                   itemBuilder: (context, index) {
                     final j = jornadasDia[index];
-                    // Normalizamos el ID de la jornada a minúsculas y sin espacios
                     final String tId = (j['ktrabajador'] ?? '').toString().trim().toLowerCase();
-                    //final tId = j['ktrabajador'];
                     
-                    // Cruzamos con el maestro de trabajadores para obtener el nombre
-                    // final trabajador = widget.trabajador.firstWhere(
-                    //   (t) => t.ktrabajador == tId, 
-                    //   orElse: () => Trabajador(ktrabajador: '', nombreStr: 'Desconocido', kagricultor: '', eliminadoBit: 0, fechaDtm: DateTime.now())
-                    // );
-                    // Buscamos en _trabajadores comparando en minúsculas
                     final trabajador = _trabajadores.firstWhere(
                       (t) => t.ktrabajador.trim().toLowerCase() == tId, 
                       orElse: () => Trabajador(
@@ -675,6 +731,66 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
       }
     );
   }
+
+  // void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+  //     builder: (context) {
+  //       return Padding(
+  //         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text("Jornada del ${fechaStr.split('-').reversed.join('/')}", style: Theme.of(context).textTheme.titleLarge),
+  //             const Divider(),
+  //             const SizedBox(height: 8),
+  //             Flexible( // Flexible evita que ListView reviente la altura del BottomSheet
+  //               child: ListView.builder(
+  //                 shrinkWrap: true,
+  //                 itemCount: jornadasDia.length,
+  //                 itemBuilder: (context, index) {
+  //                   final j = jornadasDia[index];
+  //                   // Normalizamos el ID de la jornada a minúsculas y sin espacios
+  //                   final String tId = (j['ktrabajador'] ?? '').toString().trim().toLowerCase();
+  //                   //final tId = j['ktrabajador'];
+                    
+  //                   // Cruzamos con el maestro de trabajadores para obtener el nombre
+  //                   // final trabajador = widget.trabajador.firstWhere(
+  //                   //   (t) => t.ktrabajador == tId, 
+  //                   //   orElse: () => Trabajador(ktrabajador: '', nombreStr: 'Desconocido', kagricultor: '', eliminadoBit: 0, fechaDtm: DateTime.now())
+  //                   // );
+  //                   // Buscamos en _trabajadores comparando en minúsculas
+  //                   final trabajador = _trabajadores.firstWhere(
+  //                     (t) => t.ktrabajador.trim().toLowerCase() == tId, 
+  //                     orElse: () => Trabajador(
+  //                       ktrabajador: '', 
+  //                       nombreStr: 'Desconocido', 
+  //                       kagricultor: '', 
+  //                       eliminadoBit: 0, 
+  //                       fechaDtm: DateTime.now()
+  //                     )
+  //                   );
+
+  //                   final horas = j['horas_flt']?.toString() ?? '0';
+  //                   final obs = j['observaciones_str']?.toString() ?? '';
+                    
+  //                   return ListTile(
+  //                     contentPadding: EdgeInsets.zero,
+  //                     leading: CircleAvatar(backgroundColor: AgriPalette.greenMain, child: const Icon(Icons.person, color: Colors.white, size: 20)),
+  //                     title: Text(trabajador.nombreStr, style: const TextStyle(fontWeight: FontWeight.bold)),
+  //                     subtitle: Text(obs.isNotEmpty ? "Horas: $horas | Obs: $obs" : "Horas: $horas"),
+  //                   );
+  //                 }
+  //               )
+  //             )
+  //           ]
+  //         )
+  //       );
+  //     }
+  //   );
+  // }
 
   // ==========================================================================
   // BLOQUE DE UI DE SECCIONES ESTÁNDAR Y ALBARANES

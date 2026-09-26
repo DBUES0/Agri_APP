@@ -3,13 +3,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart'; // Mantén este para el plan B
 import 'dart:convert'; // Para que funcione jsonDecode
 import 'package:shared_preferences/shared_preferences.dart'; // Para leer los datos guardados
-import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/record_trabajador.dart';
 import '../services/api_service.dart';
 import '../utils/app_palette.dart';
-import 'package:agriapp/utils/app_theme.dart';
 import '../utils/ui_utils.dart'; // Para mensajeEmergente
 import 'page_trabajador_add.dart';
 import 'page_trabajador_perfil.dart'; // <--- Nueva página que crearemos

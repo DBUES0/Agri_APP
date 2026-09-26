@@ -5,18 +5,22 @@ import 'package:uuid/uuid.dart';
 import '../models/record_trabajador.dart';
 import '../services/api_service.dart';
 import '../utils/ui_utils.dart';
-import '../utils/app_palette.dart';
 
 class PageJornadaAdd extends StatefulWidget {
   final List<Trabajador> trabajadores;
+  final DateTime? fechaInicial;
+  final List<Map<String, dynamic>>? jornadasExistentes;
 
-  const PageJornadaAdd({Key? key, required this.trabajadores}) : super(key: key);
+  const PageJornadaAdd({Key? key, required this.trabajadores, this.fechaInicial, this.jornadasExistentes}) : super(key: key);
 
   @override
   State<PageJornadaAdd> createState() => _PageJornadaAddState();
 }
 
 class _PageJornadaAddState extends State<PageJornadaAdd> {
+
+  List<Trabajador> _trabajadoresFrescos = [];
+  
   final ApiService _apiService = ApiService();
   
   DateTime _fechaSeleccionada = DateTime.now();
@@ -35,14 +39,36 @@ class _PageJornadaAddState extends State<PageJornadaAdd> {
 
   bool _cargando = true;
   bool _guardando = false;
+// --- Añade esta variable debajo de tus otros Maps ---
+  final Map<String, String> _jornadasIds = {}; // Guarda el kjornada existente
 
   @override
   void initState() {
     super.initState();
+    // Si venimos de editar, fijamos la fecha que nos pasa el Dashboard
+    if (widget.fechaInicial != null) {
+      _fechaSeleccionada = widget.fechaInicial!;
+    }
     _inicializarPantalla();
   }
+  // Future<void> _inicializarPantalla() async {
+  //   await _cargarUltimoHorario();
+  //   await _cargarMarcajesDelDia();
+  //   _filtrarTrabajadoresPorFecha();
+  //   if (mounted) setState(() => _cargando = false);
+  // }
 
   Future<void> _inicializarPantalla() async {
+    // NUEVO: Consultamos los trabajadores actualizados nada más entrar
+    try {
+      final rawData = await _apiService.fetchList('tbltrabajador');
+      _trabajadoresFrescos = rawData.map((json) => Trabajador.fromJson(json)).toList();
+    } catch (e) {
+      print("Error cargando trabajadores frescos: $e");
+      // Si hay error (ej. sin internet y sin caché), usamos los que vienen del Dashboard por si acaso
+      _trabajadoresFrescos = widget.trabajadores;
+    }
+
     await _cargarUltimoHorario();
     await _cargarMarcajesDelDia();
     _filtrarTrabajadoresPorFecha();
@@ -206,18 +232,75 @@ Future<void> _cargarMarcajesDelDia() async {
   //   }
   // }
 
+  // void _filtrarTrabajadoresPorFecha() {
+  //   final fechaLimpia = DateTime(_fechaSeleccionada.year, _fechaSeleccionada.month, _fechaSeleccionada.day);
+
+  //   _activosEnFecha = widget.trabajadores.where((t) {
+  //     if (t.eliminadoBit == 1) return false;
+
+  //     bool esActivo = false;
+  //     if (t.fechainicioultimocontratoDtm != null) {
+  //       final inicio = DateTime(t.fechainicioultimocontratoDtm!.year, t.fechainicioultimocontratoDtm!.month, t.fechainicioultimocontratoDtm!.day);
+  //       if (!inicio.isAfter(fechaLimpia)) esActivo = true;
+  //     }
+
+  //     if (esActivo && t.fechafinultimocontratoDtm != null) {
+  //       final fin = DateTime(t.fechafinultimocontratoDtm!.year, t.fechafinultimocontratoDtm!.month, t.fechafinultimocontratoDtm!.day);
+  //       if (fin.isBefore(fechaLimpia)) esActivo = false;
+  //     }
+  //     return esActivo;
+  //   }).toList();
+
+  //   _seleccionarTodos = false;
+  //   for (var t in _activosEnFecha) {
+  //     _checksTrabajadores[t.ktrabajador] = false;
+  //     _obsControllers[t.ktrabajador] ??= TextEditingController(); 
+  //     _horasIndividualesControllers[t.ktrabajador] ??= TextEditingController();
+  //     _horarioIndividualControllers[t.ktrabajador] ??= TextEditingController();
+  //   }
+  //   setState(() {});
+  // }
+
+// void _filtrarTrabajadoresPorFecha() {
+//     final fechaLimpia = DateTime(_fechaSeleccionada.year, _fechaSeleccionada.month, _fechaSeleccionada.day);
+
+//     // CAMBIO: Usamos _trabajadoresFrescos en lugar de widget.trabajadores
+//     _activosEnFecha = _trabajadoresFrescos.where((t) {
+//       if (t.eliminadoBit == 1) return false;
+
+//       bool esActivo = false;
+//       if (t.fechainicioultimocontratoDtm != null) {
+//         final inicio = DateTime(t.fechainicioultimocontratoDtm!.year, t.fechainicioultimocontratoDtm!.month, t.fechainicioultimocontratoDtm!.day);
+//         if (!inicio.isAfter(fechaLimpia)) esActivo = true;
+//       }
+
+//       if (esActivo && t.fechafinultimocontratoDtm != null) {
+//         final fin = DateTime(t.fechafinultimocontratoDtm!.year, t.fechafinultimocontratoDtm!.month, t.fechafinultimocontratoDtm!.day);
+//         if (fin.isBefore(fechaLimpia)) esActivo = false;
+//       }
+//       return esActivo;
+//     }).toList();
+
+//     _seleccionarTodos = false;
+//     for (var t in _activosEnFecha) {
+//       _checksTrabajadores[t.ktrabajador] = false;
+//       _obsControllers[t.ktrabajador] ??= TextEditingController(); 
+//       _horasIndividualesControllers[t.ktrabajador] ??= TextEditingController();
+//       _horarioIndividualControllers[t.ktrabajador] ??= TextEditingController();
+//     }
+//     setState(() {});
+//   }
+// --- Sustituye tu _filtrarTrabajadoresPorFecha por este ---
   void _filtrarTrabajadoresPorFecha() {
     final fechaLimpia = DateTime(_fechaSeleccionada.year, _fechaSeleccionada.month, _fechaSeleccionada.day);
 
-    _activosEnFecha = widget.trabajadores.where((t) {
+    _activosEnFecha = _trabajadoresFrescos.where((t) {
       if (t.eliminadoBit == 1) return false;
-
       bool esActivo = false;
       if (t.fechainicioultimocontratoDtm != null) {
         final inicio = DateTime(t.fechainicioultimocontratoDtm!.year, t.fechainicioultimocontratoDtm!.month, t.fechainicioultimocontratoDtm!.day);
         if (!inicio.isAfter(fechaLimpia)) esActivo = true;
       }
-
       if (esActivo && t.fechafinultimocontratoDtm != null) {
         final fin = DateTime(t.fechafinultimocontratoDtm!.year, t.fechafinultimocontratoDtm!.month, t.fechafinultimocontratoDtm!.day);
         if (fin.isBefore(fechaLimpia)) esActivo = false;
@@ -225,15 +308,47 @@ Future<void> _cargarMarcajesDelDia() async {
       return esActivo;
     }).toList();
 
+    // Comprobamos si estamos visualizando exactamente la misma fecha que nos enviaron para editar
+    bool esMismaFecha = widget.fechaInicial != null && 
+        _fechaSeleccionada.year == widget.fechaInicial!.year &&
+        _fechaSeleccionada.month == widget.fechaInicial!.month &&
+        _fechaSeleccionada.day == widget.fechaInicial!.day;
+
     _seleccionarTodos = false;
+    _jornadasIds.clear();
+
     for (var t in _activosEnFecha) {
-      _checksTrabajadores[t.ktrabajador] = false;
       _obsControllers[t.ktrabajador] ??= TextEditingController(); 
       _horasIndividualesControllers[t.ktrabajador] ??= TextEditingController();
       _horarioIndividualControllers[t.ktrabajador] ??= TextEditingController();
+
+      Map<String, dynamic>? jornadaPrevia;
+      
+      // Si estamos en la fecha a editar, buscamos los datos de este trabajador
+      if (esMismaFecha && widget.jornadasExistentes != null) {
+        final encontradas = widget.jornadasExistentes!.where(
+          (j) => j['ktrabajador'].toString().toLowerCase() == t.ktrabajador.toLowerCase()
+        );
+        if (encontradas.isNotEmpty) jornadaPrevia = encontradas.first;
+      }
+
+      // Pre-rellenamos la interfaz si hay datos
+      if (jornadaPrevia != null) {
+        _checksTrabajadores[t.ktrabajador] = true;
+        _jornadasIds[t.ktrabajador] = jornadaPrevia['kjornada'];
+        _horasIndividualesControllers[t.ktrabajador]!.text = jornadaPrevia['horas_flt']?.toString() ?? '';
+        _horarioIndividualControllers[t.ktrabajador]!.text = jornadaPrevia['horario_str']?.toString() ?? '';
+        _obsControllers[t.ktrabajador]!.text = jornadaPrevia['observaciones_str']?.toString() ?? '';
+      } else {
+        _checksTrabajadores[t.ktrabajador] = false;
+        _horasIndividualesControllers[t.ktrabajador]!.clear();
+        _horarioIndividualControllers[t.ktrabajador]!.clear();
+        _obsControllers[t.ktrabajador]!.clear();
+      }
     }
     setState(() {});
   }
+
 
   Future<void> _seleccionarFecha() async {
     final DateTime? picked = await showDatePicker(
@@ -282,62 +397,61 @@ Future<void> _cargarMarcajesDelDia() async {
     });
   }
 
-  Future<void> _guardarJornadas() async {
-    final seleccionados = _activosEnFecha.where((t) => _checksTrabajadores[t.ktrabajador] == true).toList();
-
-    if (seleccionados.isEmpty) {
-      mensajeEmergente(context, 'Debes seleccionar al menos un trabajador', tipo: 'warning');
-      return;
-    }
-
+Future<void> _guardarJornadas() async {
     setState(() => _guardando = true);
 
     try {
       final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
       
-      final jornadasExistentes = await _apiService.fetchList('tbljornada');
-      final Set<String> trabajadoresConJornadaHoy = jornadasExistentes
-          .where((j) => j['fecha_dtm'] != null && j['fecha_dtm'].toString().startsWith(fechaStr) && j['eliminado_bit'] == 0)
-          .map((j) => j['ktrabajador'].toString())
-          .toSet();
-
       int guardados = 0;
-      int duplicados = 0;
+      int actualizados = 0;
+      int eliminados = 0;
 
-      for (var t in seleccionados) {
-        if (trabajadoresConJornadaHoy.contains(t.ktrabajador)) {
-          duplicados++;
-          continue; 
+      for (var t in _activosEnFecha) {
+        final bool seleccionado = _checksTrabajadores[t.ktrabajador] == true;
+        final String? idExistente = _jornadasIds[t.ktrabajador];
+
+        if (seleccionado) {
+          final horasStr = _horasIndividualesControllers[t.ktrabajador]?.text.replaceAll(',', '.') ?? '';
+          final horarioInd = _horarioIndividualControllers[t.ktrabajador]?.text.trim() ?? '';
+          final horarioFinal = horarioInd.isNotEmpty ? horarioInd : _horarioController.text.trim();
+
+          final data = {
+            'ktrabajador': t.ktrabajador,
+            'fecha_dtm': fechaStr,
+            'horario_str': horarioFinal,
+            'horas_flt': double.tryParse(horasStr) ?? 0.0,
+            'observaciones_str': _obsControllers[t.ktrabajador]?.text.trim(),
+            'eliminado_bit': 0,
+          };
+
+          if (idExistente != null) {
+            // ACTUALIZAR (El trabajador ya tenía jornada y sigue marcado)
+            await _apiService.putGeneric('tbljornada', idExistente, data);
+            actualizados++;
+          } else {
+            // CREAR NUEVO (El trabajador no tenía jornada y ha sido marcado)
+            data['kjornada'] = const Uuid().v4();
+            await _apiService.postGeneric('tbljornada', data);
+            guardados++;
+          }
+        } else {
+          // ELIMINAR (El trabajador tenía jornada previamente, pero ahora lo han desmarcado)
+          if (idExistente != null) {
+            await _apiService.deleteGeneric('tbljornada', idExistente);
+            eliminados++;
+          }
         }
-
-        final horasStr = _horasIndividualesControllers[t.ktrabajador]?.text.replaceAll(',', '.') ?? '';
-        final horarioInd = _horarioIndividualControllers[t.ktrabajador]?.text.trim() ?? '';
-        final horarioFinal = horarioInd.isNotEmpty ? horarioInd : _horarioController.text.trim();
-
-        final data = {
-          'kjornada': const Uuid().v4(),
-          'ktrabajador': t.ktrabajador,
-          'fecha_dtm': fechaStr,
-          'horario_str': horarioFinal,
-          'horas_flt': double.tryParse(horasStr),
-          'observaciones_str': _obsControllers[t.ktrabajador]?.text.trim(),
-          'eliminado_bit': 0,
-        };
-
-        await _apiService.postGeneric('tbljornada', data);
-        guardados++;
       }
 
       if (!mounted) return;
 
-      if (guardados > 0) {
-        mensajeEmergente(context, '$guardados jornada(s) añadida(s) correctamente.', tipo: 'success');
-        if (duplicados > 0) {
-          mensajeEmergente(context, '$duplicados trabajador(es) omitido(s) porque ya tenían jornada registrada hoy.', tipo: 'warning');
-        }
+      if (guardados > 0 || actualizados > 0 || eliminados > 0) {
+        mensajeEmergente(context, 'Completado: $guardados nuevos, $actualizados editados, $eliminados eliminados.', tipo: 'success');
         Navigator.pop(context, true);
       } else {
-        mensajeEmergente(context, 'No se ha guardado nada. Todos los seleccionados ya tenían jornada hoy.', tipo: 'error');
+        mensajeEmergente(context, 'No se ha detectado ningún cambio.', tipo: 'warning');
+        Navigator.pop(context, false);
       }
     } catch (e) {
       if (!mounted) return;
@@ -346,6 +460,71 @@ Future<void> _cargarMarcajesDelDia() async {
       if (mounted) setState(() => _guardando = false);
     }
   }
+
+  // Future<void> _guardarJornadas() async {
+  //   final seleccionados = _activosEnFecha.where((t) => _checksTrabajadores[t.ktrabajador] == true).toList();
+
+  //   if (seleccionados.isEmpty) {
+  //     mensajeEmergente(context, 'Debes seleccionar al menos un trabajador', tipo: 'warning');
+  //     return;
+  //   }
+
+  //   setState(() => _guardando = true);
+
+  //   try {
+  //     final fechaStr = DateFormat('yyyy-MM-dd').format(_fechaSeleccionada);
+      
+  //     final jornadasExistentes = await _apiService.fetchList('tbljornada');
+  //     final Set<String> trabajadoresConJornadaHoy = jornadasExistentes
+  //         .where((j) => j['fecha_dtm'] != null && j['fecha_dtm'].toString().startsWith(fechaStr) && j['eliminado_bit'] == 0)
+  //         .map((j) => j['ktrabajador'].toString())
+  //         .toSet();
+
+  //     int guardados = 0;
+  //     int duplicados = 0;
+
+  //     for (var t in seleccionados) {
+  //       if (trabajadoresConJornadaHoy.contains(t.ktrabajador)) {
+  //         duplicados++;
+  //         continue; 
+  //       }
+
+  //       final horasStr = _horasIndividualesControllers[t.ktrabajador]?.text.replaceAll(',', '.') ?? '';
+  //       final horarioInd = _horarioIndividualControllers[t.ktrabajador]?.text.trim() ?? '';
+  //       final horarioFinal = horarioInd.isNotEmpty ? horarioInd : _horarioController.text.trim();
+
+  //       final data = {
+  //         'kjornada': const Uuid().v4(),
+  //         'ktrabajador': t.ktrabajador,
+  //         'fecha_dtm': fechaStr,
+  //         'horario_str': horarioFinal,
+  //         'horas_flt': double.tryParse(horasStr),
+  //         'observaciones_str': _obsControllers[t.ktrabajador]?.text.trim(),
+  //         'eliminado_bit': 0,
+  //       };
+
+  //       await _apiService.postGeneric('tbljornada', data);
+  //       guardados++;
+  //     }
+
+  //     if (!mounted) return;
+
+  //     if (guardados > 0) {
+  //       mensajeEmergente(context, '$guardados jornada(s) añadida(s) correctamente.', tipo: 'success');
+  //       if (duplicados > 0) {
+  //         mensajeEmergente(context, '$duplicados trabajador(es) omitido(s) porque ya tenían jornada registrada hoy.', tipo: 'warning');
+  //       }
+  //       Navigator.pop(context, true);
+  //     } else {
+  //       mensajeEmergente(context, 'No se ha guardado nada. Todos los seleccionados ya tenían jornada hoy.', tipo: 'error');
+  //     }
+  //   } catch (e) {
+  //     if (!mounted) return;
+  //     mensajeEmergente(context, 'Error al guardar: $e', tipo: 'error');
+  //   } finally {
+  //     if (mounted) setState(() => _guardando = false);
+  //   }
+  // }
 
   @override
   void dispose() {
