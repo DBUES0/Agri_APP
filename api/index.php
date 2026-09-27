@@ -278,25 +278,41 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
     }
 });
 
-// Endpoint público para información y novedades en el Login
 $app->get('/api/info', function (Request $request, Response $response) {
-    // 1. Leer el mensaje desde un archivo TXT plano
-    $archivoTxt = __DIR__ . '/docs/novedades.txt';
-    $mensaje = file_exists($archivoTxt) 
-        ? file_get_contents($archivoTxt) 
-        : "Bienvenido a la aplicación de gestión agrícola. (Crea el archivo novedades.txt en el servidor)";
+    $archivoJson = __DIR__ . '/docs/options.json';
 
-    // 2. Definir la versión más reciente de la app
-    // Cámbialo aquí cuando compiles una nueva versión en Flutter
-    $versionUltima = "1.0"; 
-    $urlActualizacion = "https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk";
+    if (file_exists($archivoJson)) {
+        $datos = json_decode(file_get_contents($archivoJson), true);
+    } else {
+        $datos = [
+            'mensaje' => 'Bienvenido a la aplicación de gestión agrícola.',
+            'version_ultima' => '1.0.0',
+            'url_apk' => 'https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk'
+        ];
+    }
 
-    return jsonResponse($response, [
-        'mensaje' => $mensaje,
-        'version_ultima' => $versionUltima,
-        'url_apk' => $urlActualizacion
-    ]);
+    return jsonResponse($response, $datos);
 });
+
+// Endpoint público para información y novedades en el Login
+// $app->get('/api/info', function (Request $request, Response $response) {
+//     // 1. Leer el mensaje desde un archivo TXT plano
+//     $archivoTxt = __DIR__ . '/docs/novedades.txt';
+//     $mensaje = file_exists($archivoTxt) 
+//         ? file_get_contents($archivoTxt) 
+//         : "Bienvenido a la aplicación de gestión agrícola. (Crea el archivo novedades.txt en el servidor)";
+
+//     // 2. Definir la versión más reciente de la app
+//     // Cámbialo aquí cuando compiles una nueva versión en Flutter
+//     $versionUltima = "1.0"; 
+//     $urlActualizacion = "https://github.com/DBUES0/Agri_APP/raw/refs/heads/main/apks/app-arm64-v8a-release.apk";
+
+//     return jsonResponse($response, [
+//         'mensaje' => $mensaje,
+//         'version_ultima' => $versionUltima,
+//         'url_apk' => $urlActualizacion
+//     ]);
+// });
 // $app->get('/api/info', function (Request $request, Response $response) use ($mensajeinicial) {
 //     $mensaje = $mensajeinicial ?? "Bienvenido a la aplicación de gestión agrícola.";
 //     return jsonResponse($response, ['mensaje' => $mensaje]);
