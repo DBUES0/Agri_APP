@@ -1,8 +1,8 @@
-
+﻿
 name: agriapp
-description: Flutter app para login y visualizaciÃƒÆ’Ã‚Â³n de datos del agricultor.
+description: Flutter app para login y visualización de datos del agricultor.
 publish_to: 'none'
-version: 1.0.20260927232234+1
+version: 1.0.20260927232855+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -18,12 +18,12 @@ dependencies:
   image_picker: ^1.2.1
   url_launcher: ^6.3.2
   open_filex: ^4.7.0
-  google_fonts: ^6.3.2  # O la versiÃƒÆ’Ã‚Â³n mÃƒÆ’Ã‚Â¡s reciente
+  google_fonts: ^6.3.2  # O la versión más reciente
   sqflite: ^2.3.0
   path: ^1.8.3
   intl: ^0.19.0
   flutter_linkify: ^6.0.0     # Para hacer los enlaces clickables
-  package_info_plus: ^8.0.0   # Para saber la versiÃƒÆ’Ã‚Â³n instalada en el S23
+  package_info_plus: ^8.0.0   # Para saber la versión instalada en el S23
   share_plus: ^10.0.0
   # shared_preferences ya la tienes
 
