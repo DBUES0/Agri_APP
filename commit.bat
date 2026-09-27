@@ -13,16 +13,17 @@ robocopy "\\192.168.1.224\html\api" "API" /MIR /R:2 /W:5 /NP /NDL /NFL
 echo.
 echo.
 echo [1/6] Generando nueva version automatica...
+
 :: Obtenemos el timestamp en formato YYYYMMDDHHmmss
 for /f %%a in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMddHHmmss'"') do set TIMESTAMP=%%a
 set NUEVA_VERSION=1.0.%TIMESTAMP%
 echo [INFO] Nueva version generada: %NUEVA_VERSION%
 
 :: A. Modificamos o insertamos la version en pubspec.yaml
-powershell -NoProfile -Command "$c = Get-Content pubspec.yaml -Raw; if ($c -match '(?m)^version:\s*.*') { $c = $c -replace '(?m)^version:\s*.*', 'version: %NUEVA_VERSION%+1' } else { $c = $c -replace '(?m)^name:\s*(.*)', \"name: `$1`r`nversion: %NUEVA_VERSION%+1\" }; [IO.File]::WriteAllText('pubspec.yaml', $c)"
+powershell -NoProfile -Command "$c = Get-Content pubspec.yaml -Raw; if ($c -match '(?m)^version:\s*.*') { $c =$c -replace '(?m)^version:\s*.*', 'version: %NUEVA_VERSION%+1' } else { $c =$c -replace '(?m)^name:\s*(.*)', \"name: `$1`r`nversion: %NUEVA_VERSION%+1\" }; [IO.File]::WriteAllText('pubspec.yaml', $c)"
 
 :: B. Modificamos options.json en local y lo replicamos al servidor web
-powershell -NoProfile -Command "$path = 'API\docs\options.json'; if (Test-Path$path) { $json = Get-Content$path -Raw | ConvertFrom-Json; $json.version_ultima = '\%NUEVA_VERSION\%';$json | ConvertTo-Json -Depth 5 | Set-Content $path; Copy-Item$path '\\192.168.1.224\html\api\docs\options.json' -Force; Write-Host '[INFO] options.json actualizado con version %NUEVA_VERSION%'; } else { Write-Host '[ALERTA] No se encontro API\docs\options.json'; }"
+powershell -NoProfile -Command "if (Test-Path 'API\docs\options.json') { $j = Get-Content 'API\docs\options.json' -Raw | ConvertFrom-Json; $j.version_ultima = '\%NUEVA_VERSION\%';$j | ConvertTo-Json -Depth 5 | Set-Content 'API\docs\options.json'; Copy-Item 'API\docs\options.json' '\\192.168.1.224\html\api\docs\options.json' -Force; Write-Host '[INFO] options.json actualizado con version %NUEVA_VERSION%' } else { Write-Host '[ALERTA] No se encontro API\docs\options.json' }"
 echo.
 echo [2/6] Limpiando carpetas y compilando en modo RELEASE...
 if exist "apks" rd /s /q "apks"
