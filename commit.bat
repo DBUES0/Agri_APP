@@ -11,25 +11,28 @@ if not exist "API" mkdir "API"
 robocopy "\\192.168.1.224\html\api" "API" /MIR /R:2 /W:5 /NP /NDL /NFL
 
 echo.
-echo.
-echo [1/6] Generando nueva version automatica...
-:: Obtenemos el timestamp en formato YYYYMMDDHHmmss
-for /f %%a in ('powershell -NoProfile -Command "Get-Date -Format 'yyyyMMddHHmmss'"') do set TIMESTAMP=%%a
-set NUEVA_VERSION=1.0.%TIMESTAMP%
-echo [INFO] Nueva version generada: %NUEVA_VERSION%
+echo [1/6] Generando nueva version automatica usando Dart...
+call dart run update_version.dart
 
-:: A. Modificamos pubspec.yaml respetando UTF-8 puro (evita caracteres raros en tildes)
-powershell -NoProfile -Command "$c = [IO.File]::ReadAllText('pubspec.yaml', [System.Text.Encoding]::UTF8); if ($c -match '(?m)^version:\s*.*') { $c = $c -replace '(?m)^version:\s*.*', 'version: %NUEVA_VERSION%+1' } else { $c = $c -replace '(?m)^name:\s*(.*)', \"name: `$1`r`nversion: %NUEVA_VERSION%+1\" }; [IO.File]::WriteAllText('pubspec.yaml', $c, [System.Text.Encoding]::UTF8)"
+:: Copiamos el JSON actualizado a la ruta de red
+copy /Y "API\docs\options.json" "\\192.168.1.224\html\api\docs\options.json" >nul
 
-:: B. Modificamos options.json en local y lo replicamos al servidor web
-powershell -NoProfile -Command "$v = '%NUEVA_VERSION%'; $p = 'API\docs\options.json'; if (Test-Path$p) { $j = Get-Content$p -Raw -Encoding UTF8 | ConvertFrom-Json; $j.version_ultima = $v; $j | ConvertTo-Json -Depth 5 | Set-Content $p -Encoding UTF8; Copy-Item$p '\\192.168.1.224\html\api\docs\options.json' -Force; Write-Host ('[INFO] options.json actualizado con version ' + $v) } else { Write-Host '[ALERTA] No se encontro API\docs\options.json' }"
 echo.
 echo [2/6] Limpiando carpetas y compilando en modo RELEASE...
 if exist "apks" rd /s /q "apks"
 mkdir "apks"
 
-:: Compilamos con la nueva version ya inyectada
-call flutter build apk --release --target-platform android-arm64 --split-per-abi
+:: Detenemos el demonio de Gradle correctamente entrando en su carpeta
+cd android
+call gradlew.bat --stop
+cd ..
+
+call flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [ERROR] La compilacion ha fallado. Se cancela el commit y la subida.
+    goto :end
+)
 
 echo.
 echo [3/6] Seleccionando APK de Release...
@@ -38,12 +41,12 @@ copy "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk" "apks\" /Y
 echo.
 echo [4/6] Haciendo Commit de App y API...
 git add .
-git commit -m "%msg% [Version %NUEVA_VERSION%]"
+git commit -m "%msg%"
 
 echo.
 echo [5/6] Subiendo a GitHub...
 git push origin main
 
 echo.
-echo [OK] Sincronizado. Version %NUEVA_VERSION% compilada y publicada.
+echo [OK] Sincronizado y compilado con exito.
 :end

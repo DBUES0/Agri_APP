@@ -1,8 +1,7 @@
-﻿
 name: agriapp
 description: Flutter app para login y visualización de datos del agricultor.
 publish_to: 'none'
-version: 1.0.20260927232855+1
+version: 1.0.20260927235144+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -18,30 +17,23 @@ dependencies:
   image_picker: ^1.2.1
   url_launcher: ^6.3.2
   open_filex: ^4.7.0
-  google_fonts: ^6.3.2  # O la versión más reciente
+  google_fonts: ^6.3.2
   sqflite: ^2.3.0
   path: ^1.8.3
   intl: ^0.19.0
-  flutter_linkify: ^6.0.0     # Para hacer los enlaces clickables
-  package_info_plus: ^8.0.0   # Para saber la versión instalada en el S23
+  flutter_linkify: ^6.0.0
+  package_info_plus: ^8.0.0
   share_plus: ^10.0.0
-  # shared_preferences ya la tienes
-
-# flutter_icons:
-#   android: true
-#   ios: true
-#   image_path:  "android/app/src/main/res/imagenes/logo_maximizada.png"
-
+  flutter_native_splash: ^2.3.5 # <--- TRASLADADO AQUÍ
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.3.5
 
 flutter_native_splash:
-  color: "#F5F5F5" # <--- ESTE ES EL CAMBIO CLAVE
-  image:  "assets/logo_maximizada.png"
+  color: "#F5F5F5"
+  image: "assets/logo_maximizada.png"
   android: true
   ios: true
   web: false
@@ -57,4 +49,3 @@ flutter_launcher_icons:
   image_path: "assets/logo_maximizada.png"
   remove_alpha_ios: true 
   adaptive_icon_background: "f5f5f5"
-#"#ffffff" # Recomendado para Android moderno
