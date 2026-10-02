@@ -77,11 +77,19 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
               }
               try {
                 // 1. Obtenemos todos los datos actuales del trabajador
-                final payload = t.toJson();
+                final Map<String, dynamic> payload = t.toJson();
+                
                 // 2. Modificamos solo la contraseña
                 payload['password_str'] = pass1Controller.text.trim();
 
-                // 3. Enviamos el objeto completo para que PHP no ponga el resto a NULL
+                // 3. ¡LA CLAVE! Convertimos cualquier DateTime a String para que jsonEncode no explote
+                payload.forEach((key, value) {
+                  if (value is DateTime) {
+                    payload[key] = value.toIso8601String(); 
+                  }
+                });
+
+                // 4. Enviamos el objeto completo para que PHP no ponga el resto a NULL
                 await _apiService.putGeneric('tbltrabajador', t.ktrabajador, payload);
                 
                 if (!mounted) return;
@@ -90,6 +98,24 @@ class _PageTrabajadoresState extends State<PageTrabajadores> {
               } catch (e) {
                 mensajeEmergente(context, 'Error al guardar contraseña: $e', tipo: 'error');
               }
+              // try {
+              //   // 1. Obtenemos el ID limpio en minúsculas para asegurar coincidencia
+              //   final idLimpio = t.ktrabajador.trim().toLowerCase();
+                
+              //   // 2. Preparamos el payload aislando la contraseña
+              //   final Map<String, dynamic> payload = {
+              //     'password_str': pass1Controller.text.trim()
+              //   };
+
+              //   // 3. Enviamos solo la actualización
+              //   await _apiService.putGeneric('tbltrabajador', idLimpio, payload);
+                
+              //   if (!mounted) return;
+              //   Navigator.pop(context);
+              //   mensajeEmergente(context, 'Contraseña guardada correctamente', tipo: 'success');
+              // } catch (e) {
+              //   mensajeEmergente(context, 'Error al guardar contraseña: $e', tipo: 'error');
+              // }
               // try {
               //   // Guardamos la contraseña en la tabla tbltrabajador
               //   await _apiService.putGeneric('tbltrabajador', t.ktrabajador, {

@@ -24,10 +24,12 @@ mkdir "apks"
 
 :: Detenemos el demonio de Gradle correctamente entrando en su carpeta
 cd android
-call gradlew.bat --stop
+:: call gradlew.bat --stop
+call gradlew.bat --stop >nul 2>&1
 cd ..
 
-call flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub
+::call flutter build apk --release --target-platform android-arm64 --split-per-abi --no-pub
+call flutter build apk --release --target-platform android-arm64 --split-per-abi
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo [ERROR] La compilacion ha fallado. Se cancela el commit y la subida.

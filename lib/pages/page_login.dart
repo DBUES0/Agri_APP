@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:package_info_plus/package_info_plus.dart'; // <-- Soluciona Error 3
-import 'package:http/http.dart' as http; // <-- Para llamar a la API directamente
+import 'package:package_info_plus/package_info_plus.dart'; 
+import 'package:http/http.dart' as http; 
 
 import '../services/api_service.dart';
 import '../services/db_service.dart';
@@ -22,11 +22,12 @@ import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../utils/app_theme.dart';
 
-// Importamos el Dashboard directamente
 import 'page_dashboard.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? mensajeError; // Permite recibir avisos de sesión caducada
+
+  const LoginPage({super.key, this.mensajeError});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -40,21 +41,55 @@ class _LoginPageState extends State<LoginPage> {
 
   String _error = '';
   bool _isLoading = false; 
-  String? _mensajeInfo; // Variable para almacenar el texto del servidor
+  String? _mensajeInfo;
 
   @override
   void initState() {
     super.initState();
+    // Si venimos de un cierre de sesión forzado, mostramos el mensaje
+    if (widget.mensajeError != null) {
+      _error = widget.mensajeError!;
+    }
+    
     _cargarInfoApp();
+    _autoLogin(); // Ejecutamos el chequeo de sesión en segundo plano
   }
-Future<void> _abrirUrl(String url) async {
+
+  // --- NUEVA FUNCIÓN: AUTO-LOGIN SILENCIOSO ---
+  Future<void> _autoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final usuarioJson = prefs.getString('usuario_json');
+
+    if (token != null && token.isNotEmpty && usuarioJson != null) {
+      setState(() => _isLoading = true);
+      
+      try {
+        final usuarioData = jsonDecode(usuarioJson);
+        final usuario = Usuario.fromJson(usuarioData);
+        
+        // Al intentar descargar, si el token expiró, la API lanzará una excepción
+        await _descargarDatosYEntrar(usuario);
+      } catch (e) {
+        // Token caducado o servidor inalcanzable
+        await prefs.remove('token');
+        if (mounted) {
+          setState(() {
+            _error = 'Tu sesión ha caducado. Es necesario hacer login de nuevo.';
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _abrirUrl(String url) async {
     final Uri uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
-  // Convierte el formato [Texto](url) en un hipervínculo clickeable ocultando la URL
   Widget _buildTextoConEnlace(String texto) {
     final RegExp exp = RegExp(r'\[([^\]]+)\]\(([^)]+)\)');
     final Iterable<RegExpMatch> matches = exp.allMatches(texto);
@@ -93,14 +128,11 @@ Future<void> _abrirUrl(String url) async {
     );
   }
 
-  // --- NUEVA FUNCIÓN CORREGIDA ---
   Future<void> _cargarInfoApp() async {
     try {
-      // Usamos http directamente para recibir el JSON completo y no pelear con getAppInfo()
       final response = await http.get(Uri.parse('https://api.bueso.duckdns.org/api/info'));
       
       if (response.statusCode == 200) {
-        // Transformamos la respuesta en un diccionario
         final Map<String, dynamic> data = jsonDecode(response.body);
 
         if (mounted) {
@@ -109,7 +141,6 @@ Future<void> _abrirUrl(String url) async {
           });
         }
 
-        // Comprobar la versión
         final packageInfo = await PackageInfo.fromPlatform();
         final versionInstalada = packageInfo.version; 
         final versionServidor = data['version_ultima']?.toString();
@@ -126,11 +157,10 @@ Future<void> _abrirUrl(String url) async {
     }
   }
 
-  // --- CUADRO DE DIÁLOGO ---
   void _mostrarAlertaActualizacion(String versionInstalada, String versionServidor, String urlApk) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Obliga al usuario a elegir
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Actualización disponible'),
         content: Text('Tienes la versión $versionInstalada y la nueva versión $versionServidor está lista para descargar.\n\n¿Deseas actualizar ahora?'),
@@ -154,123 +184,63 @@ Future<void> _abrirUrl(String url) async {
     );
   }
 
-  // Future<void> _login() async {
-  //   setState(() {
-  //     _error = '';
-  //     _isLoading = true; 
-  //   });
+  // --- DESCARGA CENTRALIZADA (Usada por Login manual y Auto-Login) ---
+  Future<void> _descargarDatosYEntrar(Usuario usuario) async {
+    final fincas = (await _apiService.fetchListV('vfincas'))
+        .map((json) => finca.fromJson(json)).toList();
 
-  //   try {
-  //     final response = await _apiService.postLogin(
-  //       _emailController.text.trim(),
-  //       _passwordController.text,
-  //     );
+    String idReal = usuario.kagricultor;
+    if (idReal.isEmpty && fincas.isNotEmpty) {
+       idReal = fincas.first.kagricultor;
+    }
+    
+    final usuarioCorregido = Usuario(
+      kagricultor: idReal,
+      nombre: usuario.nombre,
+      apellidos: usuario.apellidos,
+      dni: usuario.dni,
+      direccion: usuario.direccion,
+      email: usuario.email,
+      telefono: usuario.telefono,
+      validado: usuario.validado,
+      bloqueado: usuario.bloqueado,
+      intentos: usuario.intentos,
+      ultimoIntento: usuario.ultimoIntento,
+      tipoUsuario: usuario.tipoUsuario,
+      prefAgrupacion: usuario.prefAgrupacion,
+      prefAgrupacionGastos: usuario.prefAgrupacionGastos,
+    );
+    
+    final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true)).map((json) => Almacen.fromJson(json)).toList();
+    final productos = (await _apiService.fetchList('tblproducto', isComun: true)).map((json) => Producto.fromJson(json)).toList();
+    final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true)).map((json) => Tipogasto.fromJson(json)).toList();
+    final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true)).map((json) => Tipodeprecio.fromJson(json)).toList();
+    final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true)).map((json) => Tipooperacion.fromJson(json)).toList();
+    final trabajadores = (await _apiService.fetchList('tbltrabajador')).map((json) => Trabajador.fromJson(json)).toList();
+    final albaranes = (await _apiService.fetchParticular('albaranesv2')).map((json) => Albaran.fromJson(json)).toList();
 
-  //     final String token = response['token'];
-  //     final Map<String, dynamic>? userData = response['usuario'];
+    if (!mounted) return;
+    TextInput.finishAutofillContext();
+    
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DashboardPage(
+          usuario: usuarioCorregido, 
+          fincas: fincas,
+          tiposGasto: tiposGasto,
+          almacen: almacenes,
+          producto: productos,
+          tipodeprecio: tiposPrecio,
+          tipooperacion: operaciones,
+          trabajador: trabajadores,
+          albaranes: albaranes,
+        ),
+      ),
+    );
+  }
 
-  //     if (userData == null) {
-  //       throw 'El servidor no devolvió los datos del usuario (clave "usuario" no encontrada).';
-  //     }
-
-  //     final prefs = await SharedPreferences.getInstance();
-  //     await prefs.setString('token', token);
-  //     await prefs.setString('usuario_json', jsonEncode(userData));
-
-  //     await DBService.instance.limpiarTodaLaBaseDeDatos();
-
-  //     final usuario = Usuario.fromJson(userData);
-      
-  //     final fincas = (await _apiService.fetchListV('vfincas'))
-  //         .map((json) => finca.fromJson(json)).toList();
-
-  //     String idReal = usuario.kagricultor;
-  //     if (idReal.isEmpty && fincas.isNotEmpty) {
-  //        idReal = fincas.first.kagricultor;
-  //     }
-      
-  //     final usuarioCorregido = Usuario(
-  //       kagricultor: idReal,
-  //       nombre: usuario.nombre,
-  //       apellidos: usuario.apellidos,
-  //       dni: usuario.dni,
-  //       direccion: usuario.direccion,
-  //       email: usuario.email,
-  //       telefono: usuario.telefono,
-  //       validado: usuario.validado,
-  //       bloqueado: usuario.bloqueado,
-  //       intentos: usuario.intentos,
-  //       ultimoIntento: usuario.ultimoIntento,
-  //       tipoUsuario: usuario.tipoUsuario,
-  //       prefAgrupacion: usuario.prefAgrupacion,
-  //       prefAgrupacionGastos: usuario.prefAgrupacionGastos,
-  //     );
-      
-  //     final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
-  //         .map((json) => Almacen.fromJson(json)).toList();
-          
-  //     final productos = (await _apiService.fetchList('tblproducto', isComun: true))
-  //         .map((json) => Producto.fromJson(json)).toList();
-          
-  //     final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
-  //         .map((json) => Tipogasto.fromJson(json)).toList();
-
-  //     final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
-  //         .map((json) => Tipodeprecio.fromJson(json)).toList();
-
-  //     final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
-  //         .map((json) => Tipooperacion.fromJson(json)).toList();
-
-  //     final trabajadores = (await _apiService.fetchList('tbltrabajador'))
-  //         .map((json) => Trabajador.fromJson(json)).toList();
-
-  //     final albaranes = (await _apiService.fetchParticular('albaranesv2'))
-  //         .map((json) => Albaran.fromJson(json)).toList();
-
-  //     if (!mounted) return;
-
-  //     TextInput.finishAutofillContext();
-      
-  //     // 6. Navegamos pasando los datos DIRECTAMENTE AL DASHBOARD
-  //     Navigator.pushReplacement(
-  //       context,
-  //       MaterialPageRoute(
-  //         builder: (context) => DashboardPage(
-  //           usuario: usuarioCorregido, 
-  //           fincas: fincas,
-  //           tiposGasto: tiposGasto,
-  //           almacen: almacenes,
-  //           producto: productos,
-  //           tipodeprecio: tiposPrecio,
-  //           tipooperacion: operaciones,
-  //           trabajador: trabajadores,
-  //           albaranes: albaranes,
-  //         ),
-  //       ),
-  //     );
-  //   // } catch (e) {
-  //   //   setState(() {
-  //   //     _error = 'Error al entrar: $e';
-  //   //   });
-  //   // } finally {
-  //   //   setState(() {
-  //   //     _isLoading = false; 
-  //   //   });
-  //   // }
-  //   } catch (e, stacktrace) { // <--- AÑADE EL stacktrace AQUÍ
-      
-  //     // 1. Esto te dirá LA LÍNEA EXACTA del archivo donde crashea (ej: usuario.dart:45)
-  //     print("🛑 TRAZA DEL ERROR:");
-  //     print(stacktrace); 
-      
-  //     setState(() {
-  //       // Tu variable de mensaje de error (la que pinta el texto rojo)
-  //       _error = "Error al entrar: $e"; 
-  //     });
-  //   }
-  // }
-
-Future<void> _login() async {
+  Future<void> _login() async {
     setState(() {
       _error = '';
       _isLoading = true; 
@@ -282,13 +252,10 @@ Future<void> _login() async {
         _passwordController.text,
       );
 
-      // 1. EL SALVAVIDAS: Comprobamos si hay error o si no hay token
       if (response.containsKey('error') || response['token'] == null) {
-        // Lanzamos el error hacia el bloque 'catch' de abajo
         throw response['error'] ?? response['mensaje'] ?? 'Usuario o contraseña incorrectos';
       }
 
-      // 2. Si el código llega aquí, el login fue un éxito y el token existe
       final String token = response['token'];
       final Map<String, dynamic> userData = response['usuario'];
 
@@ -302,84 +269,15 @@ Future<void> _login() async {
 
       await DBService.instance.limpiarTodaLaBaseDeDatos();
 
-      final usuario = Usuario.fromJson(userData);
-      
-      final fincas = (await _apiService.fetchListV('vfincas'))
-          .map((json) => finca.fromJson(json)).toList();
+      // Enrutamos a la descarga centralizada
+      await _descargarDatosYEntrar(Usuario.fromJson(userData));
 
-      String idReal = usuario.kagricultor;
-      if (idReal.isEmpty && fincas.isNotEmpty) {
-         idReal = fincas.first.kagricultor;
-      }
-      
-      final usuarioCorregido = Usuario(
-        kagricultor: idReal,
-        nombre: usuario.nombre,
-        apellidos: usuario.apellidos,
-        dni: usuario.dni,
-        direccion: usuario.direccion,
-        email: usuario.email,
-        telefono: usuario.telefono,
-        validado: usuario.validado,
-        bloqueado: usuario.bloqueado,
-        intentos: usuario.intentos,
-        ultimoIntento: usuario.ultimoIntento,
-        tipoUsuario: usuario.tipoUsuario,
-        prefAgrupacion: usuario.prefAgrupacion,
-        prefAgrupacionGastos: usuario.prefAgrupacionGastos,
-      );
-      
-      final almacenes = (await _apiService.fetchList('tblalmacen', isMixto: true))
-          .map((json) => Almacen.fromJson(json)).toList();
-          
-      final productos = (await _apiService.fetchList('tblproducto', isComun: true))
-          .map((json) => Producto.fromJson(json)).toList();
-          
-      final tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
-          .map((json) => Tipogasto.fromJson(json)).toList();
-
-      final tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
-          .map((json) => Tipodeprecio.fromJson(json)).toList();
-
-      final operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
-          .map((json) => Tipooperacion.fromJson(json)).toList();
-
-      final trabajadores = (await _apiService.fetchList('tbltrabajador'))
-          .map((json) => Trabajador.fromJson(json)).toList();
-
-      final albaranes = (await _apiService.fetchParticular('albaranesv2'))
-          .map((json) => Albaran.fromJson(json)).toList();
-
-      if (!mounted) return;
-
-      TextInput.finishAutofillContext();
-      
-      // Navegamos al Dashboard
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DashboardPage(
-            usuario: usuarioCorregido, 
-            fincas: fincas,
-            tiposGasto: tiposGasto,
-            almacen: almacenes,
-            producto: productos,
-            tipodeprecio: tiposPrecio,
-            tipooperacion: operaciones,
-            trabajador: trabajadores,
-            albaranes: albaranes,
-          ),
-        ),
-      );
     } catch (e, stacktrace) { 
       print("🛑 TRAZA DEL ERROR:");
       print(stacktrace); 
       
       setState(() {
-        // Mostramos el texto correctamente en rojo
         _error = "Error al entrar: $e"; 
-        
-        // ¡IMPORTANTE! Apagamos el círculo de carga
         _isLoading = false; 
       });
     }
@@ -444,15 +342,12 @@ Future<void> _login() async {
               ),
             ],
 
-// Cambiamos el Spacer para empujarlo hacia abajo, pero sin aplastarlo
             const Spacer(flex: 2), 
             
-            // --- TEXTO DINÁMICO DEL SERVIDOR ---
             if (_mensajeInfo != null && _mensajeInfo!.isNotEmpty)
-              // SafeArea protege el texto de los botones de navegación de Android/iOS
               SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 30.0), // Aumentamos este valor a 30
+                  padding: const EdgeInsets.only(bottom: 30.0), 
                   child: _buildTextoConEnlace(_mensajeInfo!),
                 ),
               ),

@@ -1,3 +1,4 @@
+//page_dashboard.dart
 import 'dart:convert';
 import 'package:agriapp/pages/page_usuario.dart';
 import 'package:agriapp/services/db_service.dart';
@@ -5,12 +6,12 @@ import 'package:agriapp/services/sync_service.dart';
 import 'package:agriapp/utils/ui_utils.dart';
 import 'package:agriapp/widgets/icono_sync.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // <--- IMPORTANTE PARA EL FORMATEO DE MESES
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // <--- IMPORT AÑADIDO PARA SOLUCIONAR EL ERROR
 import '../services/api_service.dart';
 import 'package:agriapp/utils/app_theme.dart';
 import 'package:agriapp/utils/app_palette.dart';
 
-// Importación de todos los modelos (Records) que definen la estructura de los datos
 import '../models/record_usuario.dart';
 import '../models/record_finca.dart';
 import '../models/record_almacen.dart';
@@ -24,9 +25,9 @@ import '../models/record_movimientovisual.dart';
 import '../pages/page_albaran.dart';
 import '../pages/page_trabajador.dart';
 import '../pages/page_jornada_add.dart';
+import '../pages/page_login.dart';
+import '../pages/page_nota.dart'; 
 
-
-/// [DashboardPage] es la pantalla principal tras el login.
 class DashboardPage extends StatefulWidget {
   final Usuario usuario;
   final List<finca> fincas;
@@ -56,20 +57,12 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final Map<String, bool> _expandedFincas = {};
-  final Map<String, bool> _expandedAlbaranes = {};
-  
-  bool _albaranesExpanded = false;
-  bool _albaranes2Expanded = false;
-  
   List<Albaran> _albaranes = [];
-  
-  // --- NUEVAS VARIABLES PARA JORNADAS ---
   List<Map<String, dynamic>> _jornadas = [];
   List<Trabajador> _trabajadores = [];
+  List<Map<String, dynamic>> _notas = [];
   
   bool _cargandoJornadas = true;
-  
   final ApiService _apiService = ApiService();
 
   static const Color colorAccion = Colors.green;
@@ -89,13 +82,29 @@ class _DashboardPageState extends State<DashboardPage> {
     SyncService.syncStream.listen((finalizadoOk) {
       if (finalizadoOk && mounted) {
         _refreshAlbaranes();
-        _refreshJornadas(); // Recargamos jornadas si hay sincro
-        _refreshTrabajadores(); // Recargamos trabajadores si hay sincro
+        _refreshJornadas(); 
+        _refreshTrabajadores(); 
       }
     });
   }
 
-  // --- NUEVA FUNCIÓN: CARGAR TRABAJADORES ---
+  Future<void> _forzarCierreSesion({String? mensaje}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LoginPage(
+            mensajeError: mensaje ?? 'Tu sesión ha caducado. Es necesario hacer login de nuevo.',
+          ),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
   Future<void> _refreshTrabajadores() async {
     try {
       final raw = await _apiService.fetchList('tbltrabajador');
@@ -108,7 +117,7 @@ class _DashboardPageState extends State<DashboardPage> {
       print("Error cargando trabajadores: $e");
     }
   }
-  // --- NUEVA FUNCIÓN: CARGAR JORNADAS ---
+
   Future<void> _refreshJornadas() async {
     try {
       final raw = await _apiService.fetchList('tbljornada');
@@ -121,6 +130,25 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       if (mounted) setState(() => _cargandoJornadas = false);
       print("Error cargando jornadas: $e");
+    }
+  }
+
+  Future<void> _refreshNotas() async {
+    try {
+      final raw = await _apiService.fetchList('tblnota');
+      if (mounted) {
+        setState(() {
+          _notas = List<Map<String, dynamic>>.from(raw).where((n) => n['eliminado_bit'] != 1 && n['eliminado_bit'] != true).toList();
+          // Ordenamos de más reciente a más antigua
+          _notas.sort((a, b) {
+            DateTime dA = DateTime.tryParse(a['fecha_dtm']?.toString() ?? '') ?? DateTime(2000);
+            DateTime dB = DateTime.tryParse(b['fecha_dtm']?.toString() ?? '') ?? DateTime(2000);
+            return dB.compareTo(dA); 
+          });
+        });
+      }
+    } catch (e) {
+      print("Error cargando notas: $e");
     }
   }
 
@@ -150,24 +178,22 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text("Cerrar Sesión", 
+        title: const Text("Cerrar Sesión", 
           style: TextStyle(color: AgriPalette.greenMain, fontWeight: FontWeight.bold)
         ),
         content: const Text("¿Estás seguro de que quieres salir de AgriAPP?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text("CANCELAR", style: TextStyle(color: AgriPalette.greyMain)),
+            child: const Text("CANCELAR", style: TextStyle(color: AgriPalette.greyMain)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AgriPalette.greenMain,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: 
-                       () => Navigator.pop(context, true),
-            child: const Text("SALIR", style: TextStyle(color: Colors.white))
-            ,
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("SALIR", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -176,37 +202,14 @@ class _DashboardPageState extends State<DashboardPage> {
     if (confirmar == true) {
       try {
         await SyncService.sincronizarTodo();
-        //DBService.instance.limpiarTodaLaBaseDeDatos();
         await DBService.instance.borrarBaseDeDatosFisica();
-        if (mounted) await _apiService.cerrarSesion(context);
+        await _forzarCierreSesion(mensaje: ''); 
       } catch (e) {
-        if (e.toString().contains("Expired token") && mounted) {
-          await _apiService.cerrarSesion(context);
+        if (e.toString().contains("Expired token") || e.toString().contains("401")) {
+          await _forzarCierreSesion();
         }
       }
     }
-  }
-
-  Future<void> _intentarSincroManual() async {
-    try {
-      mensajeEmergente(context, "Comprobando conexión...", tipo: 'info');
-      await SyncService.sincronizarTodo();
-    } catch (e) {
-      if (e.toString().contains("Expired token") || e.toString().contains("401")) {
-        mensajeEmergente(context, "Tu sesión ha caducado. Identifícate de nuevo.", tipo: 'error');
-        if (mounted) await _apiService.cerrarSesion(context);
-      } else {
-        mensajeEmergente(context, "Sin conexión o error de red", tipo: 'error');
-      }
-    }
-  }
-
-  Future<void> _refreshAll() async {
-    await _refreshAlbaranes();
-    await _refreshGastos();
-    await _refreshOperaciones();
-    await _refreshJornadas();
-    DBService.instance.limpiarTodaLaBaseDeDatos();
   }
 
   Future<void> _refreshAlbaranes() async {
@@ -218,24 +221,22 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {}); 
   }
 
-  // Método para refrescar todos los datos de la app, incluyendo albaranes, gastos, operaciones y jornadas. Se puede llamar desde un botón de sincronización manual.
   Future<void> _superRefresh() async {
-    await SyncService.sincronizarTodo();
-    await _refreshAlbaranes();
-    await _refreshTrabajadores(); // <--- AÑADIR ESTA LÍNEA
-    await _refreshJornadas();
-    setState(() {}); 
+    try {
+      await SyncService.sincronizarTodo();
+      await _refreshAlbaranes();
+      await _refreshTrabajadores(); 
+      await _refreshJornadas();
+      await _refreshNotas();
+      setState(() {}); 
+    } catch (e) {
+      if (e.toString().contains("Expired token") || e.toString().contains("401")) {
+        await _forzarCierreSesion();
+      }
+    }
   }
 
-  Future<void> _refreshGastos() async {
-    mensajeEmergente(context, 'Simulando refresco de Gastos...',segundos: 1 );
-  }
-
-  Future<void> _refreshOperaciones() async {
-    mensajeEmergente(context, 'Simulando refresco de Operaciones...',segundos: 1);
-  }
-
-Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
+  Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -262,58 +263,6 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
       } catch (e) {
         if (!mounted) return;
         mensajeEmergente(context, 'Error al eliminar línea: $e', tipo: 'error');
-      }
-    }
-  }
-
-  Future<void> _confirmDeleteAlbaran(Albaran albaran) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Eliminar Albarán?'),
-        content: const Text('Se ocultará el albarán y sus productos asociados.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: colorAccion),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar', style: TextStyle(color: colorFondo)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-    try {
-            // 1. Usamos deleteGeneric: tu API ya marca eliminado_bit = 1 y fechaeliminacion_dtm
-            await _apiService.deleteGeneric('tblalbaran', albaran.kalbaran);
-
-            for (var detalle in albaran.detalles) {
-              if (detalle.kalbarandetalle.isNotEmpty) {
-                await _apiService.deleteGeneric('tblalbarandetalle', detalle.kalbarandetalle);
-              }
-            }
-
-            // 2. Si usas tabla SQLite local, borramos el registro para que el Stream no lo resucite
-            final db = await DBService.instance.database;
-            await db.delete('pendientes_sincro', where: 'id = ?', whereArgs: [albaran.kalbaran]);
-
-            // 3. Forzamos la recarga de datos frescos del servidor
-            await _refreshAlbaranes();
-
-            if (mounted) {
-              mensajeEmergente(context, "Albarán eliminado correctamente");
-            }
-          } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'), 
-            backgroundColor: colorEliminar,
-            behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
-          ),
-        );
       }
     }
   }
@@ -470,19 +419,35 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
                       );
 
                       if (guardadoOk == true) {
-                        // Si se guardó una jornada, refrescamos las jornadas (y opcionalmente trabajadores)
                         _refreshJornadas(); 
                       }
                     },
                   ),
                 ],
-                // Sustituimos el texto estático por el bloque dinámico de los últimos 12 meses
                 child: _cargandoJornadas 
                   ? const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())) 
                   : Column(children: _construirHistorialJornadas()),
               ),
 
-              _buildSection('Notas', onAdd: () {}),
+              // _buildSection('Notas', onAdd: () {}),
+              _buildSection2(
+                'Notas',
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    color: AgriPalette.greenMain,
+                    tooltip: 'Añadir Nota',
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => PageNota(usuario: widget.usuario)),
+                      );
+                      if (result == true) _refreshNotas();
+                    },
+                  ),
+                ],
+                child: Column(children: _construirHistorialNotas()),
+              ),
             ],
           );
         },
@@ -490,20 +455,14 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
     );
   }
 
-  // ==========================================================================
-  // MOTOR DEL HISTORIAL Y CALENDARIO DE JORNADAS
-  // ==========================================================================
-
   List<Widget> _construirHistorialJornadas() {
     List<Widget> mesesUI = [];
     DateTime ahora = DateTime.now();
     
     for (int i = 0; i < 12; i++) {
-      // Dart maneja automáticamente los cambios de año si le restamos meses (ej: 0 es diciembre del año anterior)
       DateTime mesActual = DateTime(ahora.year, ahora.month - i, 1);
       String labelMes = DateFormat('yyyy/MM').format(mesActual);
       
-      // Filtrar jornadas que correspondan a este año y mes, y no estén borradas
       var jornadasMes = _jornadas.where((j) {
          DateTime? d = DateTime.tryParse(j['fecha_dtm']?.toString() ?? '');
          return d != null && 
@@ -513,7 +472,6 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
                 j['eliminado_bit'] != true;
       }).toList();
       
-      // Calculamos: 22D, 2337h, 7p
       Set<String> diasUnicos = {};
       double horasTotales = 0;
       int totalRegistrosPersonas = jornadasMes.length;
@@ -534,9 +492,8 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             dense: true,
-            visualDensity: const VisualDensity(vertical: -3), // Reduce la altura vertical al mínimo
+            visualDensity: const VisualDensity(vertical: -3), 
             tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            // Ponemos fecha y resumen en la misma línea
             title: Row(
               children: [
                 Text(
@@ -563,28 +520,78 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
     return mesesUI;
   }
 
+List<Widget> _construirHistorialNotas() {
+    if (_notas.isEmpty) {
+      return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay notas registradas"))];
+    }
+
+    Map<String, List<Map<String, dynamic>>> notasAgrupadas = {};
+    for (var n in _notas) {
+      DateTime d = DateTime.tryParse(n['fecha_dtm']?.toString() ?? '') ?? DateTime.now();
+      String mesStr = DateFormat('yyyy/MM').format(d);
+      notasAgrupadas.putIfAbsent(mesStr, () => []).add(n);
+    }
+
+    String mesActualStr = DateFormat('yyyy/MM').format(DateTime.now());
+    List<Widget> mesesUI = [];
+
+    for (var entry in notasAgrupadas.entries) {
+      String mes = entry.key;
+      List<Map<String, dynamic>> notasMes = entry.value;
+      bool isCurrentMonth = (mes == mesActualStr);
+
+      mesesUI.add(
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: isCurrentMonth,
+            title: Text(mes, style: const TextStyle(fontWeight: FontWeight.bold)),
+            children: notasMes.map((nota) {
+              String titulo = nota['titulo_str'] ?? 'Sin título';
+              String fecha = '';
+              if (nota['fecha_dtm'] != null) {
+                fecha = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(nota['fecha_dtm']));
+              }
+              
+              return ListTile(
+                leading: const Icon(Icons.sticky_note_2, color: Colors.amber),
+                title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(fecha),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => PageNota(usuario: widget.usuario, nota: nota)),
+                  );
+                  if (result == true) _refreshNotas();
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      );
+    }
+    return mesesUI;
+  }
+
   Widget _construirCalendarioMensual(int year, int month, List<Map<String,dynamic>> jornadasMes) {
     int daysInMonth = DateTime(year, month + 1, 0).day;
-    int firstWeekday = DateTime(year, month, 1).weekday; // 1 = Lunes, 7 = Domingo
+    int firstWeekday = DateTime(year, month, 1).weekday; 
     
     List<Widget> dayWidgets = [];
     
-    // Cabeceras (L M X J V S D)
     List<String> diasSemana = ['L','M','X','J','V','S','D'];
     for(var d in diasSemana) {
       dayWidgets.add(Center(child: Text(d, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12))));
     }
     
-    // Espacios vacíos antes del primer día del mes
     for(int i = 1; i < firstWeekday; i++) {
       dayWidgets.add(const SizedBox());
     }
     
-    // Días del mes
     for(int d = 1; d <= daysInMonth; d++) {
       String dateStr = "$year-${month.toString().padLeft(2,'0')}-${d.toString().padLeft(2,'0')}";
       
-      // Extraemos todas las jornadas registradas ese día
       var jornadasDia = jornadasMes.where((j) => j['fecha_dtm']?.toString().startsWith(dateStr) == true).toList();
       bool hasData = jornadasDia.isNotEmpty;
       
@@ -621,7 +628,7 @@ Future<void> _confirmDeleteDetalle(MovimientoVisual m) async {
     );
   }
 
-void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
+  void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
@@ -632,7 +639,6 @@ void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadas
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- CABECERA CON BOTÓN DE EDITAR ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -645,15 +651,15 @@ void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadas
                     color: AgriPalette.greenMain,
                     tooltip: 'Editar Jornada',
                     onPressed: () async {
-                      Navigator.pop(context); // Cierra el panel inferior actual
+                      Navigator.pop(context); 
                       
                       final bool? guardadoOk = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => PageJornadaAdd(
                             trabajadores: _trabajadores,
-                            fechaInicial: DateTime.parse(fechaStr), // <-- Fijamos la fecha
-                            jornadasExistentes: jornadasDia,        // <-- Pasamos los datos existentes
+                            fechaInicial: DateTime.parse(fechaStr), 
+                            jornadasExistentes: jornadasDia,        
                           ),
                         ),
                       );
@@ -663,37 +669,10 @@ void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadas
                       }
                     },
                   ),
-                  // IconButton(
-                  //   icon: const Icon(Icons.edit_calendar),
-                  //   color: AgriPalette.greenMain,
-                  //   tooltip: 'Editar Jornada',
-                  //   onPressed: () async {
-                  //     // 1. Cerramos el panel inferior actual
-                  //     Navigator.pop(context);
-                      
-                  //     // 2. Abrimos la pantalla de jornadas
-                  //     final bool? guardadoOk = await Navigator.push(
-                  //       context,
-                  //       MaterialPageRoute(
-                  //         builder: (context) => PageJornadaAdd(
-                  //           trabajadores: _trabajadores,
-                  //           // Opcional: Podrías pasarle la fecha para que el calendario se abra en este día exacto
-                  //           // fechaSeleccionada: DateTime.parse(fechaStr),
-                  //         ),
-                  //       ),
-                  //     );
-
-                  //     // 3. Si se guardó algo al editar, recargamos el dashboard
-                  //     if (guardadoOk == true) {
-                  //       _refreshJornadas();
-                  //     }
-                  //   },
-                  // ),
                 ],
               ),
               const Divider(),
               const SizedBox(height: 8),
-              // --- LISTA DE TRABAJADORES ---
               Flexible( 
                 child: ListView.builder(
                   shrinkWrap: true,
@@ -731,70 +710,6 @@ void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadas
       }
     );
   }
-
-  // void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadasDia) {
-  //   showModalBottomSheet(
-  //     context: context,
-  //     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-  //     builder: (context) {
-  //       return Padding(
-  //         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-  //         child: Column(
-  //           mainAxisSize: MainAxisSize.min,
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             Text("Jornada del ${fechaStr.split('-').reversed.join('/')}", style: Theme.of(context).textTheme.titleLarge),
-  //             const Divider(),
-  //             const SizedBox(height: 8),
-  //             Flexible( // Flexible evita que ListView reviente la altura del BottomSheet
-  //               child: ListView.builder(
-  //                 shrinkWrap: true,
-  //                 itemCount: jornadasDia.length,
-  //                 itemBuilder: (context, index) {
-  //                   final j = jornadasDia[index];
-  //                   // Normalizamos el ID de la jornada a minúsculas y sin espacios
-  //                   final String tId = (j['ktrabajador'] ?? '').toString().trim().toLowerCase();
-  //                   //final tId = j['ktrabajador'];
-                    
-  //                   // Cruzamos con el maestro de trabajadores para obtener el nombre
-  //                   // final trabajador = widget.trabajador.firstWhere(
-  //                   //   (t) => t.ktrabajador == tId, 
-  //                   //   orElse: () => Trabajador(ktrabajador: '', nombreStr: 'Desconocido', kagricultor: '', eliminadoBit: 0, fechaDtm: DateTime.now())
-  //                   // );
-  //                   // Buscamos en _trabajadores comparando en minúsculas
-  //                   final trabajador = _trabajadores.firstWhere(
-  //                     (t) => t.ktrabajador.trim().toLowerCase() == tId, 
-  //                     orElse: () => Trabajador(
-  //                       ktrabajador: '', 
-  //                       nombreStr: 'Desconocido', 
-  //                       kagricultor: '', 
-  //                       eliminadoBit: 0, 
-  //                       fechaDtm: DateTime.now()
-  //                     )
-  //                   );
-
-  //                   final horas = j['horas_flt']?.toString() ?? '0';
-  //                   final obs = j['observaciones_str']?.toString() ?? '';
-                    
-  //                   return ListTile(
-  //                     contentPadding: EdgeInsets.zero,
-  //                     leading: CircleAvatar(backgroundColor: AgriPalette.greenMain, child: const Icon(Icons.person, color: Colors.white, size: 20)),
-  //                     title: Text(trabajador.nombreStr, style: const TextStyle(fontWeight: FontWeight.bold)),
-  //                     subtitle: Text(obs.isNotEmpty ? "Horas: $horas | Obs: $obs" : "Horas: $horas"),
-  //                   );
-  //                 }
-  //               )
-  //             )
-  //           ]
-  //         )
-  //       );
-  //     }
-  //   );
-  // }
-
-  // ==========================================================================
-  // BLOQUE DE UI DE SECCIONES ESTÁNDAR Y ALBARANES
-  // ==========================================================================
 
   Widget _buildSection(String title, {required VoidCallback onAdd, Widget? child}) {
     return Card(
@@ -894,7 +809,6 @@ void _mostrarDetalleJornada(String fechaStr, List<Map<String, dynamic>> jornadas
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete, size: 20, color: AgriPalette.greenMain),
-                  //onPressed: () => _confirmDeleteAlbaran(m.albaranPadre),
                   onPressed: () => _confirmDeleteDetalle(m),
                 ),
               ],
