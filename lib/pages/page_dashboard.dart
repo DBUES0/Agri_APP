@@ -554,15 +554,23 @@ List<Widget> _construirHistorialNotas() {
               }
               
               return ListTile(
-                leading: const Icon(Icons.sticky_note_2, color: Colors.amber),
+                leading: const Icon(Icons.sticky_note_2, color: AgriPalette.greenMain),
                 title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(fecha),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                 onTap: () async {
+                  // NAVEGACIÓN CORREGIDA PARA PUNTO 2
                   final result = await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => PageNota(usuario: widget.usuario, nota: nota)),
+                    MaterialPageRoute(
+                      builder: (context) => PageNota(
+                        usuario: widget.usuario,
+                        // Pasamos el Map 'nota' completo que estamos iterando
+                        nota: nota, 
+                      ),
+                    ),
                   );
+                  // Si vuelve con true, recargamos la lista
                   if (result == true) _refreshNotas();
                 },
               );

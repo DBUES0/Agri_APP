@@ -1,20 +1,21 @@
-//page_note.dart
+//page_nota.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart'; // <--- OBLIGATORIO PARA getApplicationDocumentsDirectory
 import 'dart:io';
 
 import '../models/record_usuario.dart';
 import '../services/api_service.dart';
+import '../services/db_service.dart'; 
 import '../utils/app_palette.dart';
 import '../utils/ui_utils.dart';
 
 class PageNota extends StatefulWidget {
   final Usuario usuario;
-  final Map<String, dynamic>? nota; // Si es null, es una nota nueva
+  final Map<String, dynamic>? nota; 
 
   const PageNota({Key? key, required this.usuario, this.nota}) : super(key: key);
 
@@ -24,23 +25,45 @@ class PageNota extends StatefulWidget {
 
 class _PageNotaState extends State<PageNota> {
   final ApiService _apiService = ApiService();
+  final _formKey = GlobalKey<FormState>();
+
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _contenidoController = TextEditingController();
   
-  List<Map<String, dynamic>> _archivos = [];
-  bool _guardando = false;
   late String _knota;
+  late DateTime _fecha;
+  List<Map<String, dynamic>> _archivos = []; 
+  bool _esNueva = true;
 
   @override
   void initState() {
     super.initState();
+    
     if (widget.nota != null) {
-      _knota = widget.nota!['knota'];
-      _tituloController.text = widget.nota!['titulo_str'] ?? '';
-      _contenidoController.text = widget.nota!['contenido_str'] ?? '';
-      _cargarArchivosAdjuntos();
+      _esNueva = false;
+      final n = widget.nota!;
+      
+      _knota = n['knota'] ?? const Uuid().v4();
+      _tituloController.text = n['titulo_str'] ?? '';
+      _contenidoController.text = n['contenido_str'] ?? '';
+      
+      if (n['fecha_dtm'] != null) {
+        try {
+          _fecha = DateTime.parse(n['fecha_dtm']);
+        } catch (_) {
+          _fecha = DateTime.now();
+        }
+      } else {
+        _fecha = DateTime.now();
+      }
+
+      if (n['archivos'] != null && n['archivos'] is List) {
+        _archivos = List<Map<String, dynamic>>.from(n['archivos']);
+      }
     } else {
+      _esNueva = true;
       _knota = const Uuid().v4();
+      _fecha = DateTime.now();
     }
   }
 
@@ -51,124 +74,200 @@ class _PageNotaState extends State<PageNota> {
     super.dispose();
   }
 
-  Future<void> _cargarArchivosAdjuntos() async {
-    // Si tu API permite filtrar archivos por kuuid, aquí los recuperaríamos
-    // Ejemplo: final rawArchivos = await _apiService.fetchList('tblarchivos?kuuid=$_knota');
-  }
-
   Future<void> _guardarNota() async {
-    setState(() => _guardando = true);
-    
     try {
       String tituloFinal = _tituloController.text.trim();
       if (tituloFinal.isEmpty) {
-        // Título genérico si está vacío
-        tituloFinal = "Nota ${DateFormat("yyyy/MM/dd 'a las' HH:mm:ss").format(DateTime.now())}";
+        final f = DateFormat("yyyy/MM/dd 'a las' HH:mm:ss");
+        tituloFinal = "Nota ${f.format(DateTime.now())}";
       }
 
-      final Map<String, dynamic> datosNota = {
+      final Map<String, dynamic> notaCompleta = {
         'knota': _knota,
         'kagricultor': widget.usuario.kagricultor,
         'titulo_str': tituloFinal,
         'contenido_str': _contenidoController.text.trim(),
-        'fecha_dtm': widget.nota != null 
-            ? widget.nota!['fecha_dtm'] 
-            : DateTime.now().toIso8601String(),
+        'fecha_dtm': _fecha.toIso8601String(),
         'eliminado_bit': 0,
+        'archivos': _archivos, 
       };
 
-      if (widget.nota == null) {
-        await _apiService.postGeneric('tblnota', datosNota);
-      } else {
-        await _apiService.putGeneric('tblnota', _knota, datosNota);
-      }
+      await DBService.instance.registrarPendiente(
+        entidad: 'nota', 
+        datos: notaCompleta
+      );
 
       if (!mounted) return;
-      Navigator.pop(context, true); // Retorna true para refrescar el Dashboard
-      mensajeEmergente(context, 'Nota guardada con éxito', tipo: 'success');
+      
+      Navigator.pop(context, true); 
+      mensajeEmergente(context, 'Nota guardada localmente', tipo: 'success');
       
     } catch (e) {
-      mensajeEmergente(context, 'Error al guardar la nota: $e', tipo: 'error');
-    } finally {
-      if (mounted) setState(() => _guardando = false);
+      mensajeEmergente(context, 'Error al guardar: $e', tipo: 'error');
     }
   }
 
-  // --- LÓGICA DE ARCHIVOS MULTIMEDIA ---
-  void _mostrarOpcionesMultimedia() {
+  Future<void> _mostrarOAnadirArchivos() async {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, 
       backgroundColor: AgriPalette.background,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: AgriPalette.greenMain),
-              title: const Text('Hacer Foto / Grabar Vídeo'),
-              onTap: () {
-                Navigator.pop(context);
-                _obtenerMultimedia(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: AgriPalette.greenMain),
-              title: const Text('Galería'),
-              onTap: () {
-                Navigator.pop(context);
-                _obtenerMultimedia(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_file, color: AgriPalette.greenMain),
-              title: const Text('Adjuntar Documento / Audio'),
-              onTap: () {
-                Navigator.pop(context);
-                _seleccionarArchivoCualquiera();
-              },
-            ),
-          ],
+        child: StatefulBuilder( 
+          builder: (context, setModalState) {
+            final archivosVisibles = _archivos.where((a) => a['eliminado_bit'] != 1).toList();
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Archivos Adjuntos',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AgriPalette.greyMain,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Divider(color: AgriPalette.greyMain.withValues(alpha: 0.2)),
+                  
+                  if (archivosVisibles.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(30),
+                      child: Text('No hay archivos adjuntos', style: TextStyle(fontStyle: FontStyle.italic, color: AgriPalette.greyMain)),
+                    )
+                  else
+                    ConstrainedBox( 
+                      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: archivosVisibles.length,
+                        itemBuilder: (context, index) {
+                          final archivo = archivosVisibles[index];
+                          final String nombre = archivo['nombrearchivo_str'] ?? archivo['nombrearchivo'] ?? 'Archivo';
+                          
+                          return ListTile(
+                            leading: const Icon(Icons.insert_drive_file, color: AgriPalette.greenMain),
+                            title: Text(nombre, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () async {
+                              final karchivo = archivo['karchivos'];
+                              if (karchivo != null) {
+                                try {
+                                  await _apiService.descargarYVerArchivo(karchivo);
+                                } catch (e) {
+                                  mensajeEmergente(context, 'No se puede abrir el archivo: $e', tipo: 'error');
+                                }
+                              } else {
+                                mensajeEmergente(context, 'Archivo no subido aún (pendiente sincro)');
+                              }
+                            },
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline, color: AgriPalette.error),
+                              onPressed: () {
+                                setState(() {
+                                  archivo['eliminado_bit'] = 1;
+                                  archivo['fechaeliminacion_dtm'] = DateTime.now().toIso8601String();
+                                });
+                                setModalState(() {}); 
+                                mensajeEmergente(context, 'Archivo marcado para eliminar', tipo: 'warning');
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                  const Divider(),
+                  
+                  _buildActionTile(
+                    context: context,
+                    icon: Icons.camera_alt,
+                    label: 'Hacer Foto',
+                    onTap: () => _handleFileAction(() => _obtenerImagen(ImageSource.camera)),
+                  ),
+                  _buildActionTile(
+                    context: context,
+                    icon: Icons.photo_library,
+                    label: 'Elegir de Galería',
+                    onTap: () => _handleFileAction(() => _obtenerImagen(ImageSource.gallery)),
+                  ),
+                  _buildActionTile(
+                    context: context,
+                    icon: Icons.attach_file,
+                    label: 'Adjuntar Archivo/PDF',
+                    onTap: () => _handleFileAction(_seleccionarYSubirArchivo),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Future<void> _obtenerMultimedia(ImageSource source) async {
+  void _handleFileAction(Function action) {
+    Navigator.pop(context); 
+    action(); 
+  }
+
+  Widget _buildActionTile({required BuildContext context, required IconData icon, required String label, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: AgriPalette.greenMain),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500, color: AgriPalette.greyMain)),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _obtenerImagen(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
-    // Permitir fotos o videos
-    final XFile? media = await picker.pickMedia(); 
-    if (media != null) {
-      await _subirArchivoAlServidor(media.path, media.name);
+    final XFile? image = await picker.pickImage(source: source, imageQuality: 70);
+
+    if (image != null) {
+      await _procesarArchivoLocal(image.path, image.name);
     }
   }
 
-  Future<void> _seleccionarArchivoCualquiera() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+  Future<void> _seleccionarYSubirArchivo() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
     if (result != null && result.files.single.path != null) {
-      await _subirArchivoAlServidor(result.files.single.path!, result.files.single.name);
+      await _procesarArchivoLocal(result.files.single.path!, result.files.single.name);
     }
   }
 
-  Future<void> _subirArchivoAlServidor(String filePath, String fileName) async {
+  Future<void> _procesarArchivoLocal(String pathOriginal, String name) async {
     try {
-      mensajeEmergente(context, 'Subiendo archivo...', tipo: 'info');
-      // Subimos usando el UUID de la nota para vincularlos
-      final response = await _apiService.uploadFile(
-        filePath: filePath,
-        kuuid: _knota,
-        tipo: 'NOTA',
-      );
+      String newFileUuid = const Uuid().v4();
+      final String extension = name.split('.').last;
       
+      // ERROR 1 SOLUCIONADO: Usamos getApplicationDocumentsDirectory
+      final directory = await getApplicationDocumentsDirectory();
+      final String nuevoPath = '${directory.path}/$newFileUuid.$extension';
+      await File(pathOriginal).copy(nuevoPath);
+
+      if (!mounted) return;
+
       setState(() {
         _archivos.add({
-          'karchivos': response['uuid'] ?? const Uuid().v4(),
-          'nombrearchivo': fileName,
+          'karchivos': newFileUuid, 
+          'kuuid': _knota,        
+          'nombrearchivo_str': name,
+          'fecha_dtm': DateTime.now().toIso8601String(),
+          'formato_str': extension.toUpperCase(),
+          'tipo_str': 'NOTA',     
+          'eliminado_bit': 0,
+          'orden_int': _archivos.length + 1,
+          'rutacompleta_str': nuevoPath, 
         });
       });
-      mensajeEmergente(context, 'Archivo subido correctamente', tipo: 'success');
+
+      mensajeEmergente(context, 'Archivo adjuntado localmente');
     } catch (e) {
-      mensajeEmergente(context, 'Error al subir archivo: $e', tipo: 'error');
+      mensajeEmergente(context, 'Error al procesar archivo: $e', tipo: 'error');
     }
   }
 
@@ -176,98 +275,60 @@ class _PageNotaState extends State<PageNota> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.nota == null ? 'Nueva Nota' : 'Editar Nota'),
+        title: Text(_esNueva ? 'Nueva Nota' : 'Editar Nota'),
         actions: [
           IconButton(
             icon: const Icon(Icons.attach_file),
             color: AgriPalette.greenMain,
-            onPressed: _mostrarOpcionesMultimedia,
+            onPressed: _mostrarOAnadirArchivos,
           ),
           IconButton(
-            icon: _guardando 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AgriPalette.greenMain, strokeWidth: 2))
-                : const Icon(Icons.save),
+            icon: const Icon(Icons.save),
             color: AgriPalette.greenMain,
-            onPressed: _guardando ? null : _guardarNota,
+            onPressed: _guardarNota,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // CABECERA: Título
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: TextField(
-              controller: _tituloController,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                hintText: 'Título (Opcional)',
-                border: InputBorder.none,
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _tituloController,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                decoration: const InputDecoration(
+                  hintText: 'Título (Opcional)',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                maxLines: 1,
               ),
-            ),
-          ),
-          const Divider(height: 1),
-          
-          // CUERPO: Contenido
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: TextField(
+              const SizedBox(height: 5),
+              // ERROR 2 SOLUCIONADO: Envuelto en Align en vez de usar parámetro
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${_fecha.day.toString().padLeft(2, '0')}/${_fecha.month.toString().padLeft(2, '0')}/${_fecha.year} ${_fecha.hour.toString().padLeft(2, '0')}:${_fecha.minute.toString().padLeft(2, '0')}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AgriPalette.greyMain),
+                ),
+              ),
+              const Divider(),
+              const SizedBox(height: 10),
+              TextFormField(
                 controller: _contenidoController,
-                maxLines: null,
+                maxLines: null, 
                 keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
                   hintText: 'Empieza a escribir aquí...',
                   border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
-            ),
+            ],
           ),
-          
-          // ZONA INFERIOR: Archivos adjuntos
-          if (_archivos.isNotEmpty) ...[
-            const Divider(height: 1),
-            Container(
-              color: AgriPalette.background,
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Archivos adjuntos:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 5),
-                  SizedBox(
-                    height: 50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _archivos.length,
-                      itemBuilder: (context, index) {
-                        final archivo = _archivos[index];
-                        return Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: AgriPalette.greenMain.withValues(alpha: 0.3)),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.insert_drive_file, size: 16, color: AgriPalette.greenMain),
-                              const SizedBox(width: 6),
-                              Text(archivo['nombrearchivo'] ?? 'Archivo', style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ]
-        ],
+        ),
       ),
     );
   }
