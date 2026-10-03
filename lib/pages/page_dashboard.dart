@@ -27,6 +27,8 @@ import '../pages/page_trabajador.dart';
 import '../pages/page_jornada_add.dart';
 import '../pages/page_login.dart';
 import '../pages/page_nota.dart'; 
+import '../pages/page_operacion.dart';
+
 
 class DashboardPage extends StatefulWidget {
   final Usuario usuario;
@@ -38,6 +40,7 @@ class DashboardPage extends StatefulWidget {
   final List<Tipooperacion> tipooperacion;
   final List<Trabajador> trabajador;
   final List<Albaran> albaranes;
+  
 
   const DashboardPage({
     Key? key,
@@ -61,6 +64,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, dynamic>> _jornadas = [];
   List<Trabajador> _trabajadores = [];
   List<Map<String, dynamic>> _notas = [];
+  List<Map<String, dynamic>> _operaciones = []; // <--- AÑADE ESTA LÍNEA
   
   bool _cargandoJornadas = true;
   final ApiService _apiService = ApiService();
@@ -153,6 +157,231 @@ Future<void> _refreshNotas() async {
     }
   }
 
+// Variables de estado para el Dashboard (Asegúrate de declararlas arriba en la clase)
+  // List<Map<String, dynamic>> _operaciones = [];
+
+  Future<void> _refreshOperaciones() async {
+    try {
+      final raw = await _apiService.fetchParticular('operacionesv2');
+      if (mounted) {
+        setState(() {
+          _operaciones = List<Map<String, dynamic>>.from(raw);
+        });
+      }
+    } catch (e) {
+      print("Error cargando operaciones: $e");
+    }
+  }
+
+List<Widget> _construirAgendaOperaciones() {
+    if (_operaciones.isEmpty) {
+      return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay tareas registradas"))];
+    }
+
+    Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
+
+    for (var op in _operaciones) {
+      DateTime dt = DateTime.tryParse(op['fechainicio_dtm']?.toString() ?? '') ?? DateTime.now();
+      // Usamos formato numérico estándar a prueba de fallos de idioma
+      String mesStr = DateFormat('MM/yyyy').format(dt); 
+      String diaStr = DateFormat('dd/MM/yyyy').format(dt);
+
+      agenda.putIfAbsent(mesStr, () => {});
+      agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
+    }
+
+    List<Widget> ui = [];
+    String mesActual = DateFormat('MM/yyyy').format(DateTime.now());
+
+    agenda.forEach((mes, diasMap) {
+      bool isCurrentMonth = (mes == mesActual);
+
+      List<Widget> diasUI = [];
+      diasMap.forEach((dia, opsDelDia) {
+        diasUI.add(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                color: Colors.grey.shade200,
+                child: Text(dia, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+              ),
+              ...opsDelDia.map((op) {
+                String tipoNombre = "Operación";
+                try {
+                  tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
+                } catch (_) {}
+
+                String horaStr = "Todo el día";
+                if (op['fechainicio_dtm'] != null && !op['fechainicio_dtm'].endsWith("00:00:00")) {
+                  DateTime inicio = DateTime.parse(op['fechainicio_dtm']);
+                  horaStr = DateFormat('HH:mm').format(inicio);
+                  if (op['fechafin_dtm'] != null) {
+                    DateTime fin = DateTime.parse(op['fechafin_dtm']);
+                    horaStr += " - ${DateFormat('HH:mm').format(fin)}";
+                  }
+                }
+
+                List trabs = op['trabajadores'] ?? [];
+
+                return ListTile(
+                  leading: const Icon(Icons.assignment, color: Colors.blueGrey),
+                  title: Text(tipoNombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text("$horaStr\n${op['descripcion_str'] ?? ''}".trim(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.people, size: 14, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text('${trabs.length}'),
+                      const SizedBox(width: 10),
+                      const Icon(Icons.arrow_forward_ios, size: 14),
+                    ],
+                  ),
+                  isThreeLine: true,
+                  onTap: () async {
+                    final result = await Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => PageOperacion(
+                        usuario: widget.usuario,
+                        trabajadores: widget.trabajador,
+                        tiposOperacion: widget.tipooperacion,
+                        operacion: op,
+                        operacionesTotales: _operaciones,
+                      )
+                    ));
+                    // Si editamos y volvemos, recargamos el dashboard entero
+                    if (result == true) _superRefresh(); 
+                  },
+                );
+              }).toList(),
+            ],
+          )
+        );
+      });
+
+      ui.add(
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: isCurrentMonth,
+            title: Text("Mes: $mes", style: const TextStyle(fontWeight: FontWeight.w900)),
+            children: diasUI,
+          ),
+        )
+      );
+    });
+
+    return ui;
+  }
+
+  // List<Widget> _construirAgendaOperaciones() {
+  //   if (_operaciones.isEmpty) {
+  //     return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay tareas registradas"))];
+  //   }
+
+  //   // Estructura de agrupación: Map<Mes, Map<Día, List<Operaciones>>>
+  //   Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
+
+  //   for (var op in _operaciones) {
+  //     DateTime dt = DateTime.tryParse(op['fechainicio_dtm']?.toString() ?? '') ?? DateTime.now();
+  //     String mesStr = DateFormat('MMMM yyyy', 'es').format(dt).toUpperCase(); // Ej: OCTUBRE 2026
+  //     String diaStr = DateFormat('dd/MM/yyyy').format(dt);
+
+  //     agenda.putIfAbsent(mesStr, () => {});
+  //     agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
+  //   }
+
+  //   List<Widget> ui = [];
+  //   String mesActual = DateFormat('MMMM yyyy', 'es').format(DateTime.now()).toUpperCase();
+
+  //   agenda.forEach((mes, diasMap) {
+  //     bool isCurrentMonth = (mes == mesActual);
+
+  //     List<Widget> diasUI = [];
+  //     diasMap.forEach((dia, opsDelDia) {
+  //       diasUI.add(
+  //         Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Container(
+  //               width: double.infinity,
+  //               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+  //               color: Colors.grey.shade100,
+  //               child: Text(dia, style: TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.greenMain)),
+  //             ),
+  //             ...opsDelDia.map((op) {
+  //               // Buscamos el nombre del tipo de operación (suponiendo que tienes widget.tipooperacion)
+  //               String tipoNombre = "Operación";
+  //               try {
+  //                 tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
+  //               } catch (_) {}
+
+  //               // Formateamos las horas
+  //               String horaStr = "Todo el día";
+  //               if (op['fechainicio_dtm'] != null && !op['fechainicio_dtm'].endsWith("00:00:00")) {
+  //                 DateTime inicio = DateTime.parse(op['fechainicio_dtm']);
+  //                 horaStr = DateFormat('HH:mm').format(inicio);
+  //                 if (op['fechafin_dtm'] != null) {
+  //                   DateTime fin = DateTime.parse(op['fechafin_dtm']);
+  //                   horaStr += " - ${DateFormat('HH:mm').format(fin)}";
+  //                 }
+  //               }
+
+  //               // Cantidad de trabajadores
+  //               List trabs = op['trabajadores'] ?? [];
+
+  //               return ListTile(
+  //                 leading: const Icon(Icons.assignment, color: Colors.blueGrey),
+  //                 title: Text(tipoNombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+  //                 subtitle: Text("$horaStr\n${op['descripcion_str'] ?? ''}".trim(), maxLines: 2, overflow: TextOverflow.ellipsis),
+  //                 trailing: Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     const Icon(Icons.people, size: 14, color: Colors.grey),
+  //                     const SizedBox(width: 4),
+  //                     Text('${trabs.length}'),
+  //                     const SizedBox(width: 10),
+  //                     const Icon(Icons.arrow_forward_ios, size: 14),
+  //                   ],
+  //                 ),
+  //                 isThreeLine: true,
+  //                 onTap: () async {
+  //                   // Cargar archivo si es necesario: import '../pages/page_operacion.dart';
+  //                   final result = await Navigator.push(context, MaterialPageRoute(
+  //                     builder: (context) => PageOperacion(
+  //                       usuario: widget.usuario,
+  //                       trabajadores: widget.trabajador,
+  //                       tiposOperacion: widget.tipooperacion,
+  //                       operacion: op,
+  //                       operacionesTotales: _operaciones,
+  //                     )
+  //                   ));
+  //                   if (result == true) _refreshOperaciones();
+  //                 },
+  //               );
+  //             }).toList(),
+  //           ],
+  //         )
+  //       );
+  //     });
+
+  //     ui.add(
+  //       Theme(
+  //         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+  //         child: ExpansionTile(
+  //           initiallyExpanded: isCurrentMonth,
+  //           title: Text(mes, style: const TextStyle(fontWeight: FontWeight.w900)),
+  //           children: diasUI,
+  //         ),
+  //       )
+  //     );
+  //   });
+
+  //   return ui;
+  // }
+
   Stream<List<Albaran>> _getAlbaranesStream() async* {
     while (true) {
       final localData = await DBService.instance.getAllFromLocal('albaranesv2'); 
@@ -229,6 +458,7 @@ Future<void> _refreshNotas() async {
       await _refreshTrabajadores(); 
       await _refreshJornadas();
       await _refreshNotas();
+      await _refreshOperaciones(); 
       setState(() {}); 
     } catch (e) {
       if (e.toString().contains("Expired token") || e.toString().contains("401")) {
@@ -390,8 +620,30 @@ Future<void> _refreshNotas() async {
                     : _construirNivelDinamicamente(gastos, widget.usuario.prefAgrupacionGastos.split(','), 0),
               ),            
               
-              _buildSection('Operaciones', onAdd: () {}),
-              
+              //_buildSection('Operaciones', onAdd: () {}),
+              _buildSection2(
+                'Operaciones',
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    color: AgriPalette.greenMain,
+                    onPressed: () async {
+                      final result = await Navigator.push(context, MaterialPageRoute(
+                        builder: (context) => PageOperacion(
+                          usuario: widget.usuario,
+                          trabajadores: widget.trabajador,
+                          tiposOperacion: widget.tipooperacion,
+                          operacionesTotales: _operaciones,
+                        )
+                      ));
+                      if (result == true) _refreshOperaciones();
+                    },
+                  ),
+                ],
+                child: Column(children: _construirAgendaOperaciones()),
+              ),
+
+
               _buildSection2(
                 'Jornadas',
                 actions: [

@@ -318,7 +318,7 @@ class _PageNotaState extends State<PageNota> {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AgriPalette.greyMain),
                 ),
               ),
-              const Divider(),
+              //const Divider(),
               const SizedBox(height: 10),
               Expanded(
                 child: TextFormField(

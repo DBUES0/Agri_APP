@@ -34,7 +34,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _emailController = TextEditingController(text: 'v.galdeanofernandez@gmail.com');
+  final TextEditingController _emailController = TextEditingController(text: 'correo@mentira.es');
   final TextEditingController _passwordController = TextEditingController(text: '');
   
   final ApiService _apiService = ApiService();

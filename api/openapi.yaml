@@ -1,9 +1,8 @@
 openapi: 3.0.0
 
-
 info:
   title: AgriAPI
-  description: API para la gestión agrícola, incluyendo autenticación, gastos, albaranes, archivos, fincas, trabajadores, operaciones y endpoints genéricos para manipulación de tablas.
+  description: API para la gestión agrícola, incluyendo autenticación, gastos, albaranes, archivos, fincas, trabajadores, operaciones, notas y endpoints genéricos para manipulación de tablas.
   version: 1.0.0
 
 servers:
@@ -15,7 +14,6 @@ servers:
     description: Servidor de test
   - url: https://api.bueso.online
     description: Cloudflare
-
 
 security:
   - bearerAuth: []
@@ -35,9 +33,10 @@ tags:
     description: Gestión de trabajadores y jornadas
   - name: Operaciones
     description: Gestión de operaciones agrícolas
+  - name: Notas
+    description: Gestión de notas y archivos adjuntos
   - name: Genéricas
     description: Endpoints genéricos para crear, editar, listar y eliminar registros en tablas
-
 
 paths:
   /api/admin/unlock/{identificador}:
@@ -99,10 +98,10 @@ paths:
               properties:
                 email:
                   type: string
-                  example: davidbueso@gmail.com
+                  example: correo@mentira.es
                 password:
                   type: string
-                  example: a*1234
+                  example: 123456
               required: [email, password]
       responses:
         '200':
@@ -229,7 +228,6 @@ paths:
             text/html:
               schema:
                 type: string
-
 
   /api/info:
     get:
@@ -514,6 +512,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
   /api/albaranes:
     get:
       tags: [Albaranes]
@@ -547,6 +546,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/albaranesv2:
+    get:
+      summary: Obtener todos los albaranes del agricultor autenticado (v2)
+      tags: [Albaranes]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de albaranes con detalles y archivos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlbaranCompleto'
+        '401':
+          description: No autorizado
+        '500':
+          description: Error interno del servidor
+
+  /api/notas:
+    get:
+      summary: Obtener todas las notas del agricultor autenticado con sus archivos
+      tags: [Notas]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de notas con archivos adjuntos integrados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotaCompleta'
+        '401':
+          description: No autorizado
+        '500':
+          description: Error interno del servidor
+
   /api/mergealbaran:
     post:
       tags: [Albaranes]
@@ -573,25 +613,6 @@ paths:
           description: JSON inválido
         '500':
           description: Error del servidor
-  /api/albaranesv2:
-    get:
-      summary: Obtener todos los albaranes del agricultor autenticado (v2)
-      tags: [Albaranes]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Lista de albaranes con detalles y archivos
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AlbaranCompleto'
-        '401':
-          description: No autorizado
-        '500':
-          description: Error interno del servidor
 
   /api/listar/productos:
     get:
@@ -637,7 +658,7 @@ paths:
                   description: Archivo a subir
                 kuuid:
                   type: string
-                  description: Id con el que se relaciona el archivo que estamos subiendo (tblalbaran, tblgastos, etc)
+                  description: Id con el que se relaciona el archivo que estamos subiendo (tblalbaran, tblgastos, tblnota, etc)
                   example: 123e4567-e89b-12d3-a456-426614174000
                 tipo:
                   type: string
@@ -1077,6 +1098,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
   /api/listarmixto/{tabla}:
     get:
       tags: [Genéricas]
@@ -1160,7 +1182,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'              
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/listarcomun/{tabla}:
     get:
@@ -1454,7 +1476,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
 
 components:
   schemas:
@@ -1879,6 +1900,8 @@ components:
       properties:
         kalbaran:
           type: string
+          description: Identificador único del albarán
+          example: c82e621d-214f-11f0-ad5a-e2b6c6b4d8df
         fecha_str:
           type: string
           format: date-time
@@ -1975,7 +1998,71 @@ components:
         fechaeliminacion_dtm:
           type: string
 
-    # Nuevo objeto para el endpoint de productos frecuentes
+    # --- NUEVOS ESQUEMAS PARA NOTAS ---
+    NotaCompleta:
+      type: object
+      properties:
+        knota:
+          type: string
+          description: Identificador único de la nota
+        kagricultor:
+          type: string
+          description: Identificador del agricultor
+        titulo_str:
+          type: string
+          nullable: true
+          description: Título de la nota
+        nota_str:
+          type: string
+          nullable: true
+          description: Contenido o cuerpo de la nota
+        fecha_dtm:
+          type: string
+          format: date-time
+          description: Fecha de creación o modificación
+        archivos:
+          type: array
+          description: Lista de archivos asociados (sin BLOB)
+          items:
+            $ref: '#/components/schemas/ArchivoNota'
+
+    ArchivoNota:
+      type: object
+      properties:
+        karchivos:
+          type: string
+        kagricultor:
+          type: string
+        kuuid:
+          type: string
+        orden_int:
+          type: integer
+          nullable: true
+        fecha_dtm:
+          type: string
+          format: date-time
+        formato_str:
+          type: string
+          nullable: true
+        sizemb_flt:
+          type: number
+          nullable: true
+        comentario_str:
+          type: string
+          nullable: true
+        nombrearchivo_str:
+          type: string
+          nullable: true
+        rutacompleta_str:
+          type: string
+          nullable: true
+        campo1_str:
+          type: string
+          nullable: true
+        tipo_str:
+          type: string
+          nullable: true
+
     ProductoOrdenado:
       type: object
       properties:
@@ -1989,13 +2076,11 @@ components:
           type: string
           format: date-time
           nullable: true
-        # REEMPLAZAR EL VIEJO CAMPO POR ESTE:
         ktipoalbaran:
           type: string
           description: Vinculación directa con el tipo de documento (ALBARAN o GASTO)
           example: "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df"
 
-    # Actualizamos Almacen para incluir ktipoalbaran y evitar el error de Null Safety
     Almacen:
       type: object
       properties:
@@ -2005,7 +2090,7 @@ components:
           type: string
         ktipoalbaran:
           type: string
-          nullable: true # <--- Crucial para evitar el error que tenías
+          nullable: true 
           example: "b42f149b-6744-11f0-ac9b-e2b6c6b4d8df"
         fecha_dtm:
           type: string

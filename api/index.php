@@ -21,6 +21,7 @@ require_once 'src/funciones.php';
 require_once 'src/mergealbaran.php';
 require_once 'src/albaranesv2.php';
 require_once 'src/notas.php';
+require_once 'src/operaciones.php'; 
 //asíme lo pone Gepeto: require_once __DIR__ . '/src/albaranesv2.php';
 
 // 3. Configuración de la app y claves
@@ -978,6 +979,14 @@ $app->get('/api/notas', function (Request $request, Response $response) {
     return getNotas($request, $response);
 });
 
+// Y estas rutas donde tienes las demás:
+$app->get('/api/operacionesv2', function (Request $request, Response $response) {
+    return getOperacionesV2($request, $response);
+});
+
+$app->post('/api/mergeoperacion', function (Request $request, Response $response) {
+    return mergeOperacion($request, $response);
+});
 
 // Insertar o actualizar un albarán y sus detalles.
 $app->post('/api/mergealbaran', function (Request $request, Response $response) {
