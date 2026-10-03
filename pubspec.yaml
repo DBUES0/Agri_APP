@@ -1,7 +1,7 @@
 name: agriapp
 description: Flutter app para login y visualización de datos del agricultor.
 publish_to: 'none'
-version: 1.0.20261003013016+1
+version: 1.0.20261004000742+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

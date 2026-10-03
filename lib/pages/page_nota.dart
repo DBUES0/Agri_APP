@@ -1,10 +1,9 @@
-//page_nota.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart'; // <--- OBLIGATORIO PARA getApplicationDocumentsDirectory
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 import '../models/record_usuario.dart';
@@ -34,6 +33,7 @@ class _PageNotaState extends State<PageNota> {
   late DateTime _fecha;
   List<Map<String, dynamic>> _archivos = []; 
   bool _esNueva = true;
+  bool _guardando = false;
 
   @override
   void initState() {
@@ -45,7 +45,7 @@ class _PageNotaState extends State<PageNota> {
       
       _knota = n['knota'] ?? const Uuid().v4();
       _tituloController.text = n['titulo_str'] ?? '';
-      _contenidoController.text = n['contenido_str'] ?? '';
+      _contenidoController.text = n['nota_str'] ?? ''; // Mapeo correcto a nota_str
       
       if (n['fecha_dtm'] != null) {
         try {
@@ -57,9 +57,11 @@ class _PageNotaState extends State<PageNota> {
         _fecha = DateTime.now();
       }
 
+      // Los archivos ya vienen listos desde el nuevo endpoint
       if (n['archivos'] != null && n['archivos'] is List) {
         _archivos = List<Map<String, dynamic>>.from(n['archivos']);
       }
+
     } else {
       _esNueva = true;
       _knota = const Uuid().v4();
@@ -75,6 +77,7 @@ class _PageNotaState extends State<PageNota> {
   }
 
   Future<void> _guardarNota() async {
+    setState(() => _guardando = true);
     try {
       String tituloFinal = _tituloController.text.trim();
       if (tituloFinal.isEmpty) {
@@ -86,24 +89,25 @@ class _PageNotaState extends State<PageNota> {
         'knota': _knota,
         'kagricultor': widget.usuario.kagricultor,
         'titulo_str': tituloFinal,
-        'contenido_str': _contenidoController.text.trim(),
+        'nota_str': _contenidoController.text.trim(),
         'fecha_dtm': _fecha.toIso8601String(),
         'eliminado_bit': 0,
-        'archivos': _archivos, 
       };
 
-      await DBService.instance.registrarPendiente(
-        entidad: 'nota', 
-        datos: notaCompleta
-      );
+      if (_esNueva) {
+        await _apiService.postGeneric('tblnota', notaCompleta);
+      } else {
+        await _apiService.putGeneric('tblnota', _knota, notaCompleta);
+      }
 
       if (!mounted) return;
-      
       Navigator.pop(context, true); 
-      mensajeEmergente(context, 'Nota guardada localmente', tipo: 'success');
+      mensajeEmergente(context, 'Nota guardada', tipo: 'success');
       
     } catch (e) {
       mensajeEmergente(context, 'Error al guardar: $e', tipo: 'error');
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
 
@@ -127,9 +131,7 @@ class _PageNotaState extends State<PageNota> {
                 children: [
                   Text(
                     'Archivos Adjuntos',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AgriPalette.greyMain,
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AgriPalette.greyMain),
                   ),
                   const SizedBox(height: 8),
                   Divider(color: AgriPalette.greyMain.withValues(alpha: 0.2)),
@@ -156,23 +158,26 @@ class _PageNotaState extends State<PageNota> {
                               final karchivo = archivo['karchivos'];
                               if (karchivo != null) {
                                 try {
+                                  // Se asume que este método apunta internamente a /api/gastos/descargararchivonas/{id}
                                   await _apiService.descargarYVerArchivo(karchivo);
                                 } catch (e) {
-                                  mensajeEmergente(context, 'No se puede abrir el archivo: $e', tipo: 'error');
+                                  mensajeEmergente(context, 'Error al abrir el archivo: $e', tipo: 'error');
                                 }
                               } else {
-                                mensajeEmergente(context, 'Archivo no subido aún (pendiente sincro)');
+                                mensajeEmergente(context, 'Archivo no subido aún');
                               }
                             },
                             trailing: IconButton(
                               icon: const Icon(Icons.delete_outline, color: AgriPalette.error),
-                              onPressed: () {
-                                setState(() {
-                                  archivo['eliminado_bit'] = 1;
-                                  archivo['fechaeliminacion_dtm'] = DateTime.now().toIso8601String();
-                                });
-                                setModalState(() {}); 
-                                mensajeEmergente(context, 'Archivo marcado para eliminar', tipo: 'warning');
+                              onPressed: () async {
+                                try {
+                                  await _apiService.deleteGeneric('tblArchivos', archivo['karchivos']);
+                                  setState(() { archivo['eliminado_bit'] = 1; });
+                                  setModalState(() {}); 
+                                  mensajeEmergente(context, 'Archivo eliminado', tipo: 'warning');
+                                } catch(e) {
+                                  mensajeEmergente(context, 'Error al borrar archivo', tipo: 'error');
+                                }
                               },
                             ),
                           );
@@ -241,31 +246,28 @@ class _PageNotaState extends State<PageNota> {
 
   Future<void> _procesarArchivoLocal(String pathOriginal, String name) async {
     try {
-      String newFileUuid = const Uuid().v4();
-      final String extension = name.split('.').last;
-      
-      // ERROR 1 SOLUCIONADO: Usamos getApplicationDocumentsDirectory
-      final directory = await getApplicationDocumentsDirectory();
-      final String nuevoPath = '${directory.path}/$newFileUuid.$extension';
-      await File(pathOriginal).copy(nuevoPath);
+      mensajeEmergente(context, 'Subiendo archivo...', tipo: 'info');
+      final response = await _apiService.uploadFile(
+        filePath: pathOriginal,
+        kuuid: _knota,
+        tipo: 'NOTA',
+      );
 
       if (!mounted) return;
 
       setState(() {
         _archivos.add({
-          'karchivos': newFileUuid, 
+          'karchivos': response['uuid'] ?? const Uuid().v4(), 
           'kuuid': _knota,        
           'nombrearchivo_str': name,
           'fecha_dtm': DateTime.now().toIso8601String(),
-          'formato_str': extension.toUpperCase(),
+          'formato_str': name.split('.').last.toUpperCase(),
           'tipo_str': 'NOTA',     
           'eliminado_bit': 0,
-          'orden_int': _archivos.length + 1,
-          'rutacompleta_str': nuevoPath, 
         });
       });
 
-      mensajeEmergente(context, 'Archivo adjuntado localmente');
+      mensajeEmergente(context, 'Archivo guardado correctamente', tipo: 'success');
     } catch (e) {
       mensajeEmergente(context, 'Error al procesar archivo: $e', tipo: 'error');
     }
@@ -283,17 +285,20 @@ class _PageNotaState extends State<PageNota> {
             onPressed: _mostrarOAnadirArchivos,
           ),
           IconButton(
-            icon: const Icon(Icons.save),
+            icon: _guardando
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AgriPalette.greenMain, strokeWidth: 2))
+                : const Icon(Icons.save),
             color: AgriPalette.greenMain,
-            onPressed: _guardarNota,
+            onPressed: _guardando ? null : _guardarNota,
           ),
         ],
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
                 controller: _tituloController,
@@ -306,7 +311,6 @@ class _PageNotaState extends State<PageNota> {
                 maxLines: 1,
               ),
               const SizedBox(height: 5),
-              // ERROR 2 SOLUCIONADO: Envuelto en Align en vez de usar parámetro
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -316,14 +320,18 @@ class _PageNotaState extends State<PageNota> {
               ),
               const Divider(),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _contenidoController,
-                maxLines: null, 
-                keyboardType: TextInputType.multiline,
-                decoration: const InputDecoration(
-                  hintText: 'Empieza a escribir aquí...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
+              Expanded(
+                child: TextFormField(
+                  controller: _contenidoController,
+                  maxLines: null, 
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  keyboardType: TextInputType.multiline,
+                  decoration: const InputDecoration(
+                    hintText: 'Empieza a escribir aquí...',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
               ),
             ],

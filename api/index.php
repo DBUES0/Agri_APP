@@ -20,6 +20,7 @@ $dotenv->load();
 require_once 'src/funciones.php';
 require_once 'src/mergealbaran.php';
 require_once 'src/albaranesv2.php';
+require_once 'src/notas.php';
 //asíme lo pone Gepeto: require_once __DIR__ . '/src/albaranesv2.php';
 
 // 3. Configuración de la app y claves
@@ -966,15 +967,24 @@ $app->get('/api/albaranes[/]', function (Request $request, Response $response) u
     }
 });
 
+
 // Obtener todos los albaranes de un agricultor con sus detalles y archivos, pero en un nuevo formato con todos los campos nuevos
 $app->get('/api/albaranesv2', function (Request $request, Response $response) {
     return getAlbaranesV2($request, $response);
 });
 
+// Obtener todas las notas de un agricultor con sus archivos adjuntos
+$app->get('/api/notas', function (Request $request, Response $response) {
+    return getNotas($request, $response);
+});
+
+
 // Insertar o actualizar un albarán y sus detalles.
 $app->post('/api/mergealbaran', function (Request $request, Response $response) {
     return mergeAlbaran($request, $response);
 });
+
+
 
 //Inserta un nuevo archivo en la BBDD y en el NAS
 $app->post('/api/archivo', function (Request $request, Response $response) use ($servername, $username, $password, $dbname, $uploadDir) {

@@ -133,13 +133,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Future<void> _refreshNotas() async {
+Future<void> _refreshNotas() async {
     try {
-      final raw = await _apiService.fetchList('tblnota');
+      // Usamos fetchParticular para llamar a /api/notas
+      final raw = await _apiService.fetchParticular('notas');
       if (mounted) {
         setState(() {
-          _notas = List<Map<String, dynamic>>.from(raw).where((n) => n['eliminado_bit'] != 1 && n['eliminado_bit'] != true).toList();
-          // Ordenamos de más reciente a más antigua
+          _notas = List<Map<String, dynamic>>.from(raw);
+          // Ordenamos localmente por si acaso
           _notas.sort((a, b) {
             DateTime dA = DateTime.tryParse(a['fecha_dtm']?.toString() ?? '') ?? DateTime(2000);
             DateTime dB = DateTime.tryParse(b['fecha_dtm']?.toString() ?? '') ?? DateTime(2000);
