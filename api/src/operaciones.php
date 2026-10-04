@@ -25,8 +25,8 @@ function getOperacionesV2(Request $request, Response $response): Response {
 
         $responseData = [];
         foreach ($operaciones as $op) {
-            // 2. Trabajadores asignados
-            $stmtTrab = $conn->prepare("SELECT ot.koperaciontrabjador, ot.ktrabajador, ot.comentario_str, t.nombre_str, t.apellidos_str 
+            // 2. Trabajadores asignados (CORRECCIÓN: Eliminado t.apellidos_str que no existe en BD)
+            $stmtTrab = $conn->prepare("SELECT ot.koperaciontrabjador, ot.ktrabajador, ot.comentario_str, t.nombre_str 
                                        FROM tbloperaciontrabajador ot 
                                        JOIN tbltrabajador t ON ot.ktrabajador = t.ktrabajador 
                                        WHERE ot.koperacion = ? AND (ot.eliminado_bit IS NULL OR ot.eliminado_bit = 0)");
@@ -68,7 +68,6 @@ function mergeOperacion(Request $request, Response $response): Response {
         $conn = conectarDB($servername, $username, $password, $dbname);
         
         // 1. Guardar/Actualizar Cabecera
-        // Usamos ON DUPLICATE KEY UPDATE para ahorrar código (requiere que koperacion sea PRIMARY KEY)
         $stmt = $conn->prepare("INSERT INTO tbloperacion (koperacion, ktipooperacion, kagricultor, fechainicio_dtm, fechafin_dtm, descripcion_str, eliminado_bit) 
                                 VALUES (?, ?, ?, ?, ?, ?, 0) 
                                 ON DUPLICATE KEY UPDATE ktipooperacion=VALUES(ktipooperacion), fechainicio_dtm=VALUES(fechainicio_dtm), fechafin_dtm=VALUES(fechafin_dtm), descripcion_str=VALUES(descripcion_str)");
@@ -77,15 +76,16 @@ function mergeOperacion(Request $request, Response $response): Response {
         $stmt->close();
 
         // 2. Limpiar trabajadores anteriores (Borrado lógico)
-        $stmtDel = $conn->prepare("UPDATE tbloperaciontrabajador SET eliminado_bit = 1 WHERE koperacion = ?");
+        $stmtDel = $conn->prepare("UPDATE tbloperaciontrabajador SET eliminado_bit = 1, fechaeliminacion_dtm = NOW() WHERE koperacion = ?");
         $stmtDel->bind_param("s", $data['koperacion']);
         $stmtDel->execute();
         $stmtDel->close();
 
         // 3. Insertar nuevos trabajadores
+        // CORRECCIÓN: Adaptado a la nueva estructura de la DB (fechaeliminacion nula y fecha_dtm insertando NOW)
         if (isset($data['trabajadores']) && is_array($data['trabajadores'])) {
-            $stmtIns = $conn->prepare("INSERT INTO tbloperaciontrabajador (koperaciontrabjador, koperacion, ktrabajador, kagricultor, comentario_str, eliminado_bit) 
-                                       VALUES (UUID(), ?, ?, ?, '', 0)");
+            $stmtIns = $conn->prepare("INSERT INTO tbloperaciontrabajador (koperaciontrabjador, koperacion, ktrabajador, kagricultor, comentario_str, eliminado_bit, fechaeliminacion_dtm, fecha_dtm) 
+                                       VALUES (UUID(), ?, ?, ?, '', 0, NULL, NOW())");
             foreach ($data['trabajadores'] as $idTrabajador) {
                 $stmtIns->bind_param("sss", $data['koperacion'], $idTrabajador, $kagricultor);
                 $stmtIns->execute();

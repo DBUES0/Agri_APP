@@ -181,8 +181,9 @@ List<Widget> _construirAgendaOperaciones() {
     Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
 
     for (var op in _operaciones) {
-      DateTime dt = DateTime.tryParse(op['fechainicio_dtm']?.toString() ?? '') ?? DateTime.now();
-      // Usamos formato numérico estándar a prueba de fallos de idioma
+      String rawDate = op['fechainicio_dtm']?.toString() ?? op['fecha_dtm']?.toString() ?? '';
+      DateTime dt = DateTime.tryParse(rawDate) ?? DateTime.now();
+      
       String mesStr = DateFormat('MM/yyyy').format(dt); 
       String diaStr = DateFormat('dd/MM/yyyy').format(dt);
 
@@ -190,197 +191,346 @@ List<Widget> _construirAgendaOperaciones() {
       agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
     }
 
+    var mesesOrdenados = agenda.keys.toList()..sort((a, b) {
+      var pA = a.split('/');
+      var pB = b.split('/');
+      var dA = DateTime(int.parse(pA[1]), int.parse(pA[0]));
+      var dB = DateTime(int.parse(pB[1]), int.parse(pB[0]));
+      return dB.compareTo(dA);
+    });
+
     List<Widget> ui = [];
     String mesActual = DateFormat('MM/yyyy').format(DateTime.now());
 
-    agenda.forEach((mes, diasMap) {
+    for (String mes in mesesOrdenados) {
       bool isCurrentMonth = (mes == mesActual);
+      var diasMap = agenda[mes]!;
+
+      var diasOrdenados = diasMap.keys.toList()..sort((a, b) {
+        var pA = a.split('/');
+        var pB = b.split('/');
+        var dA = DateTime(int.parse(pA[2]), int.parse(pA[1]), int.parse(pA[0]));
+        var dB = DateTime(int.parse(pB[2]), int.parse(pB[1]), int.parse(pB[0]));
+        return dB.compareTo(dA);
+      });
 
       List<Widget> diasUI = [];
-      diasMap.forEach((dia, opsDelDia) {
+      
+      for (String dia in diasOrdenados) {
+        var opsDelDia = diasMap[dia]!;
+        
+        // CADA DÍA ES AHORA UN ACORDEÓN EXPANDIBLE
         diasUI.add(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                color: Colors.grey.shade200,
-                child: Text(dia, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: true, // Desplegado por defecto
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              title: Row(
+                children: [
+                  Container(width: 4, height: 20, color: AgriPalette.greenMain),
+                  const SizedBox(width: 8),
+                  Text(
+                    dia, 
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.textoVerdeOscuro),
+                  ),
+                ],
               ),
-              ...opsDelDia.map((op) {
+              children: opsDelDia.map((op) {
                 String tipoNombre = "Operación";
                 try {
                   tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
                 } catch (_) {}
 
-                String horaStr = "Todo el día";
-                if (op['fechainicio_dtm'] != null && !op['fechainicio_dtm'].endsWith("00:00:00")) {
-                  DateTime inicio = DateTime.parse(op['fechainicio_dtm']);
-                  horaStr = DateFormat('HH:mm').format(inicio);
-                  if (op['fechafin_dtm'] != null) {
-                    DateTime fin = DateTime.parse(op['fechafin_dtm']);
-                    horaStr += " - ${DateFormat('HH:mm').format(fin)}";
-                  }
-                }
-
                 List trabs = op['trabajadores'] ?? [];
 
                 return ListTile(
-                  leading: const Icon(Icons.assignment, color: Colors.blueGrey),
-                  title: Text(tipoNombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("$horaStr\n${op['descripcion_str'] ?? ''}".trim(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  dense: true, 
+                  visualDensity: const VisualDensity(vertical: -2), 
+                  leading: const Icon(Icons.assignment_outlined, color: AgriPalette.greenMain, size: 20),
+                  title: Text(
+                    tipoNombre, 
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: AgriPalette.textoVerdeOscuro),
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.people, size: 14, color: Colors.grey),
+                      const Icon(Icons.people_outline, size: 16, color: AgriPalette.greyMain),
                       const SizedBox(width: 4),
-                      Text('${trabs.length}'),
+                      Text('${trabs.length}', style: const TextStyle(color: AgriPalette.greyMain, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 10),
-                      const Icon(Icons.arrow_forward_ios, size: 14),
+                      const Icon(Icons.arrow_forward_ios, size: 12, color: AgriPalette.greyMain),
                     ],
                   ),
-                  isThreeLine: true,
                   onTap: () async {
                     final result = await Navigator.push(context, MaterialPageRoute(
                       builder: (context) => PageOperacion(
                         usuario: widget.usuario,
-                        trabajadores: widget.trabajador,
+                        // ¡IMPORTANTE! Pasamos _trabajadores (dinámico) en vez de widget.trabajador (estático)
+                        trabajadores: _trabajadores, 
                         tiposOperacion: widget.tipooperacion,
                         operacion: op,
                         operacionesTotales: _operaciones,
                       )
                     ));
-                    // Si editamos y volvemos, recargamos el dashboard entero
                     if (result == true) _superRefresh(); 
                   },
                 );
               }).toList(),
-            ],
+            ),
           )
         );
-      });
+      }
 
       ui.add(
         Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             initiallyExpanded: isCurrentMonth,
-            title: Text("Mes: $mes", style: const TextStyle(fontWeight: FontWeight.w900)),
+            title: Text("Mes: $mes", style: const TextStyle(fontWeight: FontWeight.w900, color: AgriPalette.textoVerdeOscuro)),
             children: diasUI,
           ),
         )
       );
-    });
+    }
 
     return ui;
   }
 
-  // List<Widget> _construirAgendaOperaciones() {
-  //   if (_operaciones.isEmpty) {
-  //     return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay tareas registradas"))];
-  //   }
+//   List<Widget> _construirAgendaOperaciones() {
+//     if (_operaciones.isEmpty) {
+//       return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay tareas registradas"))];
+//     }
 
-  //   // Estructura de agrupación: Map<Mes, Map<Día, List<Operaciones>>>
-  //   Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
+//     // Estructura: Mes -> (Día -> Lista de Operaciones)
+//     Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
 
-  //   for (var op in _operaciones) {
-  //     DateTime dt = DateTime.tryParse(op['fechainicio_dtm']?.toString() ?? '') ?? DateTime.now();
-  //     String mesStr = DateFormat('MMMM yyyy', 'es').format(dt).toUpperCase(); // Ej: OCTUBRE 2026
-  //     String diaStr = DateFormat('dd/MM/yyyy').format(dt);
+//     for (var op in _operaciones) {
+//       // Usamos fechainicio_dtm, si es nulo tiramos de fecha_dtm (fecha de creación)
+//       String rawDate = op['fechainicio_dtm']?.toString() ?? op['fecha_dtm']?.toString() ?? '';
+//       DateTime dt = DateTime.tryParse(rawDate) ?? DateTime.now();
+      
+//       String mesStr = DateFormat('MM/yyyy').format(dt); 
+//       String diaStr = DateFormat('dd/MM/yyyy').format(dt);
 
-  //     agenda.putIfAbsent(mesStr, () => {});
-  //     agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
-  //   }
+//       agenda.putIfAbsent(mesStr, () => {});
+//       agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
+//     }
 
-  //   List<Widget> ui = [];
-  //   String mesActual = DateFormat('MMMM yyyy', 'es').format(DateTime.now()).toUpperCase();
+//     // ORDENACIÓN EXPLÍCITA DE MESES (De más reciente a más antiguo)
+//     var mesesOrdenados = agenda.keys.toList()..sort((a, b) {
+//       var pA = a.split('/');
+//       var pB = b.split('/');
+//       var dA = DateTime(int.parse(pA[1]), int.parse(pA[0]));
+//       var dB = DateTime(int.parse(pB[1]), int.parse(pB[0]));
+//       return dB.compareTo(dA);
+//     });
 
-  //   agenda.forEach((mes, diasMap) {
-  //     bool isCurrentMonth = (mes == mesActual);
+//     List<Widget> ui = [];
+//     String mesActual = DateFormat('MM/yyyy').format(DateTime.now());
 
-  //     List<Widget> diasUI = [];
-  //     diasMap.forEach((dia, opsDelDia) {
-  //       diasUI.add(
-  //         Column(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             Container(
-  //               width: double.infinity,
-  //               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-  //               color: Colors.grey.shade100,
-  //               child: Text(dia, style: TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.greenMain)),
-  //             ),
-  //             ...opsDelDia.map((op) {
-  //               // Buscamos el nombre del tipo de operación (suponiendo que tienes widget.tipooperacion)
-  //               String tipoNombre = "Operación";
-  //               try {
-  //                 tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
-  //               } catch (_) {}
+//     for (String mes in mesesOrdenados) {
+//       bool isCurrentMonth = (mes == mesActual);
+//       var diasMap = agenda[mes]!;
 
-  //               // Formateamos las horas
-  //               String horaStr = "Todo el día";
-  //               if (op['fechainicio_dtm'] != null && !op['fechainicio_dtm'].endsWith("00:00:00")) {
-  //                 DateTime inicio = DateTime.parse(op['fechainicio_dtm']);
-  //                 horaStr = DateFormat('HH:mm').format(inicio);
-  //                 if (op['fechafin_dtm'] != null) {
-  //                   DateTime fin = DateTime.parse(op['fechafin_dtm']);
-  //                   horaStr += " - ${DateFormat('HH:mm').format(fin)}";
-  //                 }
-  //               }
+//       // ORDENACIÓN EXPLÍCITA DE DÍAS (De más reciente a más antiguo)
+//       var diasOrdenados = diasMap.keys.toList()..sort((a, b) {
+//         var pA = a.split('/');
+//         var pB = b.split('/');
+//         var dA = DateTime(int.parse(pA[2]), int.parse(pA[1]), int.parse(pA[0]));
+//         var dB = DateTime(int.parse(pB[2]), int.parse(pB[1]), int.parse(pB[0]));
+//         return dB.compareTo(dA);
+//       });
 
-  //               // Cantidad de trabajadores
-  //               List trabs = op['trabajadores'] ?? [];
+//       List<Widget> diasUI = [];
+      
+//       for (String dia in diasOrdenados) {
+//         var opsDelDia = diasMap[dia]!;
+        
+//         diasUI.add(
+//           Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               // --- CABECERA DEL DÍA (Más visual y compacta) ---
+//               Container(
+//                 width: double.infinity,
+//                 margin: const EdgeInsets.only(top: 8),
+//                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+//                 decoration: BoxDecoration(
+//                   color: AgriPalette.greyMain.withOpacity(0.1), // Suave para diferenciar el día
+//                   border: const Border(left: BorderSide(color: AgriPalette.greenMain, width: 4)),
+//                 ),
+//                 child: Text(
+//                   dia, 
+//                   style: const TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.textoVerdeOscuro),
+//                 ),
+//               ),
+              
+//               // --- TAREAS COMPACTAS DEL DÍA ---
+//               ...opsDelDia.map((op) {
+//                 String tipoNombre = "Operación";
+//                 try {
+//                   tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
+//                 } catch (_) {}
 
-  //               return ListTile(
-  //                 leading: const Icon(Icons.assignment, color: Colors.blueGrey),
-  //                 title: Text(tipoNombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-  //                 subtitle: Text("$horaStr\n${op['descripcion_str'] ?? ''}".trim(), maxLines: 2, overflow: TextOverflow.ellipsis),
-  //                 trailing: Row(
-  //                   mainAxisSize: MainAxisSize.min,
-  //                   children: [
-  //                     const Icon(Icons.people, size: 14, color: Colors.grey),
-  //                     const SizedBox(width: 4),
-  //                     Text('${trabs.length}'),
-  //                     const SizedBox(width: 10),
-  //                     const Icon(Icons.arrow_forward_ios, size: 14),
-  //                   ],
-  //                 ),
-  //                 isThreeLine: true,
-  //                 onTap: () async {
-  //                   // Cargar archivo si es necesario: import '../pages/page_operacion.dart';
-  //                   final result = await Navigator.push(context, MaterialPageRoute(
-  //                     builder: (context) => PageOperacion(
-  //                       usuario: widget.usuario,
-  //                       trabajadores: widget.trabajador,
-  //                       tiposOperacion: widget.tipooperacion,
-  //                       operacion: op,
-  //                       operacionesTotales: _operaciones,
-  //                     )
-  //                   ));
-  //                   if (result == true) _refreshOperaciones();
-  //                 },
-  //               );
-  //             }).toList(),
-  //           ],
-  //         )
-  //       );
-  //     });
+//                 List trabs = op['trabajadores'] ?? [];
 
-  //     ui.add(
-  //       Theme(
-  //         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-  //         child: ExpansionTile(
-  //           initiallyExpanded: isCurrentMonth,
-  //           title: Text(mes, style: const TextStyle(fontWeight: FontWeight.w900)),
-  //           children: diasUI,
-  //         ),
-  //       )
-  //     );
-  //   });
+//                 return ListTile(
+//                   dense: true, 
+//                   visualDensity: const VisualDensity(vertical: -2), // Compactación al máximo
+//                   leading: const Icon(Icons.assignment_outlined, color: AgriPalette.greenMain, size: 20),
+//                   title: Text(
+//                     tipoNombre, 
+//                     style: const TextStyle(fontWeight: FontWeight.w600, color: AgriPalette.textoVerdeOscuro),
+//                   ),
+//                   trailing: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       const Icon(Icons.people_outline, size: 16, color: AgriPalette.greyMain),
+//                       const SizedBox(width: 4),
+//                       Text('${trabs.length}', style: const TextStyle(color: AgriPalette.greyMain, fontWeight: FontWeight.bold)),
+//                       const SizedBox(width: 10),
+//                       const Icon(Icons.arrow_forward_ios, size: 12, color: AgriPalette.greyMain),
+//                     ],
+//                   ),
+//                   onTap: () async {
+//                     final result = await Navigator.push(context, MaterialPageRoute(
+//                       builder: (context) => PageOperacion(
+//                         usuario: widget.usuario,
+//                         trabajadores: widget.trabajador,
+//                         tiposOperacion: widget.tipooperacion,
+//                         operacion: op,
+//                         operacionesTotales: _operaciones,
+//                       )
+//                     ));
+//                     if (result == true) _superRefresh(); 
+//                   },
+//                 );
+//               }).toList(),
+//             ],
+//           )
+//         );
+//       }
 
-  //   return ui;
-  // }
+//       ui.add(
+//         Theme(
+//           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+//           child: ExpansionTile(
+//             initiallyExpanded: isCurrentMonth,
+//             title: Text("Mes: $mes", style: const TextStyle(fontWeight: FontWeight.w900, color: AgriPalette.textoVerdeOscuro)),
+//             children: diasUI,
+//           ),
+//         )
+//       );
+//     }
+
+//     return ui;
+//   }
+// // List<Widget> _construirAgendaOperaciones() {
+//     if (_operaciones.isEmpty) {
+//       return [const Padding(padding: EdgeInsets.all(16), child: Text("No hay tareas registradas"))];
+//     }
+
+//     Map<String, Map<String, List<Map<String, dynamic>>>> agenda = {};
+
+//     for (var op in _operaciones) {
+//       DateTime dt = DateTime.tryParse(op['fechainicio_dtm']?.toString() ?? '') ?? DateTime.now();
+//       String mesStr = DateFormat('MM/yyyy').format(dt); 
+//       String diaStr = DateFormat('dd/MM/yyyy').format(dt);
+
+//       agenda.putIfAbsent(mesStr, () => {});
+//       agenda[mesStr]!.putIfAbsent(diaStr, () => []).add(op);
+//     }
+
+//     List<Widget> ui = [];
+//     String mesActual = DateFormat('MM/yyyy').format(DateTime.now());
+
+//     agenda.forEach((mes, diasMap) {
+//       bool isCurrentMonth = (mes == mesActual);
+
+//       List<Widget> diasUI = [];
+//       diasMap.forEach((dia, opsDelDia) {
+//         diasUI.add(
+//           Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               // Barra del Día
+//               Container(
+//                 width: double.infinity,
+//                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+//                 color: AgriPalette.greyMain.withValues(alpha: 0.1), // Usamos la paleta para el gris suave
+//                 child: Text(
+//                   dia, 
+//                   style: const TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.textoVerdeOscuro),
+//                 ),
+//               ),
+//               // Lista compacta de Tareas del día
+//               ...opsDelDia.map((op) {
+//                 String tipoNombre = "Operación";
+//                 try {
+//                   tipoNombre = widget.tipooperacion.firstWhere((t) => t.ktipooperacion == op['ktipooperacion']).tipooperacionStr;
+//                 } catch (_) {}
+
+//                 List trabs = op['trabajadores'] ?? [];
+
+//                 return ListTile(
+//                   dense: true, // Reduce aún más la altura del elemento
+//                   visualDensity: const VisualDensity(vertical: -2), // Compactación máxima permitida por Material
+//                   leading: const Icon(Icons.assignment_outlined, color: AgriPalette.greenMain, size: 20),
+//                   title: Text(
+//                     tipoNombre, 
+//                     style: const TextStyle(fontWeight: FontWeight.w600, color: AgriPalette.textoVerdeOscuro),
+//                   ),
+//                   trailing: Row(
+//                     mainAxisSize: MainAxisSize.min,
+//                     children: [
+//                       const Icon(Icons.people_outline, size: 16, color: AgriPalette.greyMain),
+//                       const SizedBox(width: 4),
+//                       Text(
+//                         '${trabs.length}', 
+//                         style: const TextStyle(color: AgriPalette.greyMain, fontWeight: FontWeight.bold),
+//                       ),
+//                       const SizedBox(width: 10),
+//                       const Icon(Icons.arrow_forward_ios, size: 12, color: AgriPalette.greyMain),
+//                     ],
+//                   ),
+//                   onTap: () async {
+//                     final result = await Navigator.push(context, MaterialPageRoute(
+//                       builder: (context) => PageOperacion(
+//                         usuario: widget.usuario,
+//                         trabajadores: widget.trabajador,
+//                         tiposOperacion: widget.tipooperacion,
+//                         operacion: op,
+//                         operacionesTotales: _operaciones,
+//                       )
+//                     ));
+//                     if (result == true) _superRefresh(); 
+//                   },
+//                 );
+//               }).toList(),
+//             ],
+//           )
+//         );
+//       });
+
+//       ui.add(
+//         Theme(
+//           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+//           child: ExpansionTile(
+//             initiallyExpanded: isCurrentMonth,
+//             title: Text(
+//               "Mes: $mes", 
+//               style: const TextStyle(fontWeight: FontWeight.w900, color: AgriPalette.textoVerdeOscuro),
+//             ),
+//             children: diasUI,
+//           ),
+//         )
+//       );
+//     });
+
+//     return ui;
+//   }
+
 
   Stream<List<Albaran>> _getAlbaranesStream() async* {
     while (true) {
@@ -621,7 +771,7 @@ List<Widget> _construirAgendaOperaciones() {
               ),            
               
               //_buildSection('Operaciones', onAdd: () {}),
-              _buildSection2(
+            _buildSection2(
                 'Operaciones',
                 actions: [
                   IconButton(
@@ -631,12 +781,12 @@ List<Widget> _construirAgendaOperaciones() {
                       final result = await Navigator.push(context, MaterialPageRoute(
                         builder: (context) => PageOperacion(
                           usuario: widget.usuario,
-                          trabajadores: widget.trabajador,
+                          trabajadores: _trabajadores, // <--- AQUÍ TAMBIÉN (estaba widget.trabajador)
                           tiposOperacion: widget.tipooperacion,
                           operacionesTotales: _operaciones,
                         )
                       ));
-                      if (result == true) _refreshOperaciones();
+                      if (result == true) _superRefresh();
                     },
                   ),
                 ],
@@ -653,11 +803,29 @@ List<Widget> _construirAgendaOperaciones() {
                     tooltip: 'Informes',
                     onPressed: () { /* Navegar a Informes */ },
                   ),
+                  // IconButton(
+                  //   icon: const Icon(Icons.people_outline),
+                  //   color: AgriPalette.greenMain,
+                  //   tooltip: 'Gestión Personal',
+                  //   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PageTrabajadores())),
+                  // ),
                   IconButton(
                     icon: const Icon(Icons.people_outline),
                     color: AgriPalette.greenMain,
                     tooltip: 'Gestión Personal',
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PageTrabajadores())),
+                    onPressed: () async { // <-- 1. Añade 'async'
+                      final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const PageTrabajadores()));
+                      
+                      
+                      // 3. Cuando la pantalla se cierre y vuelva al Dashboard, forzamos el refresco:
+                      if (result == true) { 
+                        await _superRefresh(); 
+                      } else {
+                        // Por si acaso no devuelves 'true' al hacer pop en la otra pantalla, 
+                        // puedes simplemente forzarlo siempre poniendo solo: await _superRefresh();
+                        await _superRefresh();
+                      }
+                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.add),

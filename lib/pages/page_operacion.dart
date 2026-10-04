@@ -78,22 +78,23 @@ class _PageOperacionState extends State<PageOperacion> {
     }
   }
 
-  bool _trabajadorActivoEnFecha(Trabajador t, DateTime fechaOperacion) {
-    if (t.fechainicioultimocontratoDtm == null) return false;
-    final inicio = t.fechainicioultimocontratoDtm!;
+bool _trabajadorActivoEnFecha(Trabajador t, DateTime fechaOperacion) {
+    // Si no tiene fecha de inicio, asumimos una fecha antigua para que aparezca siempre
+    final inicio = t.fechainicioultimocontratoDtm ?? DateTime(2000);
     final fin = t.fechafinultimocontratoDtm;
     
     final inicioLimpio = DateTime(inicio.year, inicio.month, inicio.day);
     final fechaLimpia = DateTime(fechaOperacion.year, fechaOperacion.month, fechaOperacion.day);
     
     if (fechaLimpia.isBefore(inicioLimpio)) return false;
+    
     if (fin != null) {
       final finLimpio = DateTime(fin.year, fin.month, fin.day);
       if (fechaLimpia.isAfter(finLimpio)) return false;
     }
     return true;
   }
-
+  
   void _verificarSolapamiento(String idTrabajador, String nombre) {
     final fechaLimpia = DateFormat('yyyy-MM-dd').format(_fecha);
     
@@ -106,13 +107,12 @@ class _PageOperacionState extends State<PageOperacion> {
         bool loTiene = trabaList.any((t) => t['ktrabajador'] == idTrabajador);
         
         if (loTiene) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Aviso: $nombre ya tiene tareas asignadas el ${DateFormat('dd/MM/yyyy').format(_fecha)}.'),
-              backgroundColor: Colors.orange.shade800,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
+          // CORRECCIÓN: Uso de tu función centralizada
+          mensajeEmergente(
+            context,
+            'Aviso: $nombre ya tiene tareas asignadas el ${DateFormat('dd/MM/yyyy').format(_fecha)}.',
+            tipo: 'warning',
+            segundos: 3,
           );
           break; 
         }
@@ -164,7 +164,7 @@ class _PageOperacionState extends State<PageOperacion> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      mensajeEmergente(context, 'Operación guardada correctamente');
+      mensajeEmergente(context, 'Operación guardada correctamente', tipo: 'success');
     } catch (e) {
       mensajeEmergente(context, 'Error: $e', tipo: 'error');
     } finally {
@@ -191,12 +191,11 @@ class _PageOperacionState extends State<PageOperacion> {
 
   @override
   Widget build(BuildContext context) {
-    // Calculamos dinámicamente los activos para pintarlos en la lista
     final activos = widget.trabajadores.where((t) => _trabajadorActivoEnFecha(t, _fecha) && t.eliminadoBit == 0).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.operacion == null ? 'Nueva Tarea' : 'Editar Tarea'),
+        title: Text(widget.operacion == null ? 'Nueva Operación' : 'Editar Operación'),
         actions: [
           IconButton(
             icon: _guardando
@@ -278,7 +277,6 @@ class _PageOperacionState extends State<PageOperacion> {
             
             const SizedBox(height: 24),
 
-            // --- SECCIÓN INLINE TRABAJADORES ---
             Text(
               'Trabajadores Asignados (${_trabajadoresSeleccionados.length})', 
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AgriPalette.greenMain)
@@ -295,7 +293,7 @@ class _PageOperacionState extends State<PageOperacion> {
                 final isSelected = _trabajadoresSeleccionados.contains(t.ktrabajador);
                 return CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading, // Coloca el checkbox a la izquierda
+                  controlAffinity: ListTileControlAffinity.leading, 
                   title: Text(t.nombreStr, style: const TextStyle(fontWeight: FontWeight.w500)),
                   subtitle: Text(t.dniStr ?? 'Sin DNI'),
                   value: isSelected,
