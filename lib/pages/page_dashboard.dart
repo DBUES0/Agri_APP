@@ -65,6 +65,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Trabajador> _trabajadores = [];
   List<Map<String, dynamic>> _notas = [];
   List<Map<String, dynamic>> _operaciones = []; // <--- AÑADE ESTA LÍNEA
+  List<finca> _fincas = []; // <-- CORREGIDO AL TIPO DE OBJETO CORRECTO
   
   bool _cargandoJornadas = true;
   final ApiService _apiService = ApiService();
@@ -78,7 +79,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     _albaranes = widget.albaranes;
     _trabajadores = widget.trabajador;
-
+    _fincas = widget.fincas;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _superRefresh();
     });
@@ -226,15 +227,9 @@ List<Widget> _construirAgendaOperaciones() {
             child: ExpansionTile(
               initiallyExpanded: true, // Desplegado por defecto
               tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-              title: Row(
-                children: [
-                  Container(width: 4, height: 20, color: AgriPalette.greenMain),
-                  const SizedBox(width: 8),
-                  Text(
-                    dia, 
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.textoVerdeOscuro),
-                  ),
-                ],
+             title: Text(
+                dia, 
+                style: const TextStyle(fontWeight: FontWeight.bold, color: AgriPalette.textoVerdeOscuro),
               ),
               children: opsDelDia.map((op) {
                 String tipoNombre = "Operación";
@@ -247,7 +242,7 @@ List<Widget> _construirAgendaOperaciones() {
                 return ListTile(
                   dense: true, 
                   visualDensity: const VisualDensity(vertical: -2), 
-                  leading: const Icon(Icons.assignment_outlined, color: AgriPalette.greenMain, size: 20),
+                  // ELIMINADA LA LÍNEA 'leading:' PARA QUITAR EL ICONO
                   title: Text(
                     tipoNombre, 
                     style: const TextStyle(fontWeight: FontWeight.w600, color: AgriPalette.textoVerdeOscuro),
@@ -271,6 +266,11 @@ List<Widget> _construirAgendaOperaciones() {
                         tiposOperacion: widget.tipooperacion,
                         operacion: op,
                         operacionesTotales: _operaciones,
+                        //fincas: _fincas, // <--- AÑADIDO PARA QUE LA PÁGINA DE OPERACIÓN TENGA ACCESO A LAS FINCAS
+                        fincas: _fincas.map((f) => {
+                          'kfinca': f.kfinca, 
+                          'nombre_str': f.nombreStr
+                        }).toList(),
                       )
                     ));
                     if (result == true) _superRefresh(); 
@@ -783,6 +783,11 @@ List<Widget> _construirAgendaOperaciones() {
                           usuario: widget.usuario,
                           trabajadores: _trabajadores, // <--- AQUÍ TAMBIÉN (estaba widget.trabajador)
                           tiposOperacion: widget.tipooperacion,
+                          //fincas: _fincas, // <--- AÑADIDO EN LOS DOS SITIOS (Botón + y edición)
+                          fincas: _fincas.map((f) => {
+                          'kfinca': f.kfinca, 
+                          'nombre_str': f.nombreStr
+                        }).toList(),
                           operacionesTotales: _operaciones,
                         )
                       ));
@@ -975,7 +980,10 @@ List<Widget> _construirHistorialNotas() {
               }
               
               return ListTile(
-                leading: const Icon(Icons.sticky_note_2, color: AgriPalette.greenMain),
+                dense: true, // Reduce el tamaño general de las fuentes y márgenes
+                visualDensity: const VisualDensity(vertical: -4), // Reduce el interlineado/altura al máximo
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0.0), // Elimina padding interno
+                // ELIMINADA LA LÍNEA 'leading' CON EL ICONO
                 title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(fecha),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 14),

@@ -10,8 +10,8 @@ function getOperacionesV2(Request $request, Response $response): Response {
         $kagricultor = $jwt->sub;
         $conn = conectarDB($servername, $username, $password, $dbname);
 
-        // 1. Cabeceras de Operaciones
-        $stmt = $conn->prepare("SELECT koperacion, ktipooperacion, kagricultor, fecha_dtm, fechainicio_dtm, fechafin_dtm, descripcion_str, numpersonas_int 
+        // AÑADIDO: kfinca en el SELECT
+        $stmt = $conn->prepare("SELECT koperacion, ktipooperacion, kagricultor, kfinca, fecha_dtm, fechainicio_dtm, fechafin_dtm, descripcion_str, numpersonas_int 
                                FROM tbloperacion 
                                WHERE kagricultor = ? AND (eliminado_bit IS NULL OR eliminado_bit = 0) 
                                ORDER BY fechainicio_dtm DESC, fecha_dtm DESC");
@@ -25,7 +25,6 @@ function getOperacionesV2(Request $request, Response $response): Response {
 
         $responseData = [];
         foreach ($operaciones as $op) {
-            // 2. Trabajadores asignados (CORRECCIÓN: Eliminado t.apellidos_str que no existe en BD)
             $stmtTrab = $conn->prepare("SELECT ot.koperaciontrabjador, ot.ktrabajador, ot.comentario_str, t.nombre_str 
                                        FROM tbloperaciontrabajador ot 
                                        JOIN tbltrabajador t ON ot.ktrabajador = t.ktrabajador 
@@ -35,7 +34,6 @@ function getOperacionesV2(Request $request, Response $response): Response {
             $op['trabajadores'] = $stmtTrab->get_result()->fetch_all(MYSQLI_ASSOC) ?: [];
             $stmtTrab->close();
 
-            // 3. Archivos adjuntos
             $stmtArch = $conn->prepare("SELECT karchivos, nombrearchivo_str, formato_str 
                                        FROM tblArchivos 
                                        WHERE kuuid = ? AND (eliminado_bit IS NULL OR eliminado_bit = 0)");
@@ -67,22 +65,21 @@ function mergeOperacion(Request $request, Response $response): Response {
     try {
         $conn = conectarDB($servername, $username, $password, $dbname);
         
-        // 1. Guardar/Actualizar Cabecera
-        $stmt = $conn->prepare("INSERT INTO tbloperacion (koperacion, ktipooperacion, kagricultor, fechainicio_dtm, fechafin_dtm, descripcion_str, eliminado_bit) 
-                                VALUES (?, ?, ?, ?, ?, ?, 0) 
-                                ON DUPLICATE KEY UPDATE ktipooperacion=VALUES(ktipooperacion), fechainicio_dtm=VALUES(fechainicio_dtm), fechafin_dtm=VALUES(fechafin_dtm), descripcion_str=VALUES(descripcion_str)");
-        $stmt->bind_param("ssssss", $data['koperacion'], $data['ktipooperacion'], $kagricultor, $data['fechainicio_dtm'], $data['fechafin_dtm'], $data['descripcion_str']);
+        // AÑADIDO: Soporte para kfinca (puede ser null)
+        $kfinca = (isset($data['kfinca']) && $data['kfinca'] !== '') ? $data['kfinca'] : null;
+
+        $stmt = $conn->prepare("INSERT INTO tbloperacion (koperacion, ktipooperacion, kagricultor, kfinca, fechainicio_dtm, fechafin_dtm, descripcion_str, eliminado_bit) 
+                                VALUES (?, ?, ?, ?, ?, ?, ?, 0) 
+                                ON DUPLICATE KEY UPDATE ktipooperacion=VALUES(ktipooperacion), kfinca=VALUES(kfinca), fechainicio_dtm=VALUES(fechainicio_dtm), fechafin_dtm=VALUES(fechafin_dtm), descripcion_str=VALUES(descripcion_str)");
+        $stmt->bind_param("sssssss", $data['koperacion'], $data['ktipooperacion'], $kagricultor, $kfinca, $data['fechainicio_dtm'], $data['fechafin_dtm'], $data['descripcion_str']);
         $stmt->execute();
         $stmt->close();
 
-        // 2. Limpiar trabajadores anteriores (Borrado lógico)
         $stmtDel = $conn->prepare("UPDATE tbloperaciontrabajador SET eliminado_bit = 1, fechaeliminacion_dtm = NOW() WHERE koperacion = ?");
         $stmtDel->bind_param("s", $data['koperacion']);
         $stmtDel->execute();
         $stmtDel->close();
 
-        // 3. Insertar nuevos trabajadores
-        // CORRECCIÓN: Adaptado a la nueva estructura de la DB (fechaeliminacion nula y fecha_dtm insertando NOW)
         if (isset($data['trabajadores']) && is_array($data['trabajadores'])) {
             $stmtIns = $conn->prepare("INSERT INTO tbloperaciontrabajador (koperaciontrabjador, koperacion, ktrabajador, kagricultor, comentario_str, eliminado_bit, fechaeliminacion_dtm, fecha_dtm) 
                                        VALUES (UUID(), ?, ?, ?, '', 0, NULL, NOW())");
