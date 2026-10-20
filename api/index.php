@@ -280,6 +280,73 @@ $app->post('/api/login', function (Request $request, Response $response) use ($s
     }
 });
 
+// Endpoint público para registrar un nuevo usuario y su finca inicial
+$app->post('/api/registro', function (Request $request, Response $response) use ($servername, $username, $password, $dbname) {
+    $data = json_decode($request->getBody()->getContents(), true);
+
+    $kagricultor = $data['kagricultor'] ?? null;
+    $nombre = $data['nombre_str'] ?? '';
+    $apellidos = $data['apellidos_str'] ?? '';
+    $email = $data['email_str'] ?? '';
+    $passwordInput = $data['password_str'] ?? '';
+    $dni = $data['dni_str'] ?? '';
+    $codigoValidacion = $data['codigo_validacion_str'] ?? '';
+    $nombreFinca = $data['nombre_finca_str'] ?? 'General';
+    $kfinca = $data['kfinca'] ?? null;
+    $areaFinca = floatval($data['aream2_flt'] ?? 10000.0);
+
+    if (!$email || !$passwordInput || !$kagricultor) {
+        return jsonResponse($response, ['error' => 'Faltan datos obligatorios para el registro.'], 400);
+    }
+
+    try {
+        $conn = conectarDB($servername, $username, $password, $dbname);
+
+        // 1. Verificar si el correo electrónico ya existe
+        $stmtCheck = $conn->prepare("SELECT kagricultor FROM tblAgricultores WHERE email_str = ? AND (eliminado_bit IS NULL OR eliminado_bit = b'0')");
+        $stmtCheck->bind_param("s", $email);
+        $stmtCheck->execute();
+        $stmtCheck->store_result();
+
+        if ($stmtCheck->num_rows > 0) {
+            $stmtCheck->close();
+            $conn->close();
+            return jsonResponse($response, ['error' => 'El correo electrónico ya está registrado.'], 400);
+        }
+        $stmtCheck->close();
+
+        // 2. Hash seguro de la contraseña
+        $hashedPassword = password_hash($passwordInput, PASSWORD_DEFAULT);
+
+        // 3. Crear el nuevo usuario en tblAgricultores (desactivado por defecto validado_bit = 0)
+        $stmtUser = $conn->prepare("INSERT INTO tblAgricultores (kagricultor, nombre_str, apellidos_str, email_str, password_str, dni_str, codigo_validacion_str, validado_bit, eliminado_bit) VALUES (?, ?, ?, ?, ?, ?, ?, 0, b'0')");
+        $stmtUser->bind_param("sssssss", $kagricultor, $nombre, $apellidos, $email, $hashedPassword, $dni, $codigoValidacion);
+        
+        if (!$stmtUser->execute()) {
+            throw new Exception("Error al insertar usuario: " . $stmtUser->error);
+        }
+        $stmtUser->close();
+
+        // 4. Crear la finca inicial en tblfinca
+        if ($kfinca) {
+            $stmtFinca = $conn->prepare("INSERT INTO tblfinca (kfinca, kagricultor, nombre_str, aream2_float) VALUES (?, ?, ?, ?)");
+            $stmtFinca->bind_param("sssd", $kfinca, $kagricultor, $nombreFinca, $areaFinca);
+            $stmtFinca->execute();
+            $stmtFinca->close();
+        }
+
+        $conn->close();
+
+        return jsonResponse($response, [
+            'mensaje' => 'Usuario registrado correctamente.',
+            'codigo_validacion' => $codigoValidacion
+        ], 201);
+
+    } catch (Exception $e) {
+        return jsonResponse($response, ['error' => 'Error del servidor: ' . $e->getMessage()], 500);
+    }
+});
+
 $app->get('/api/info', function (Request $request, Response $response) {
     $archivoJson = __DIR__ . '/docs/options.json';
 

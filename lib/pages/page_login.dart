@@ -21,8 +21,10 @@ import '../models/record_tipooperacion.dart';
 import '../models/record_trabajador.dart';
 import '../models/record_albaran.dart';
 import '../utils/app_theme.dart';
+import '../utils/app_palette.dart';
 
 import 'page_dashboard.dart';
+import 'page_registro.dart';
 
 class LoginPage extends StatefulWidget {
   final String? mensajeError; // Permite recibir avisos de sesión caducada
@@ -323,13 +325,38 @@ class _LoginPageState extends State<LoginPage> {
 
             const SizedBox(height: 30),
             
+            // _isLoading 
+            //   ? const CircularProgressIndicator() 
+            //   : ElevatedButton(
+            //       onPressed: _login, 
+            //       child: const Text("ENTRAR"),
+            //     ),
             _isLoading 
               ? const CircularProgressIndicator() 
-              : ElevatedButton(
-                  onPressed: _login, 
-                  child: const Text("ENTRAR"),
-                ),
-                
+              : Column(
+                  children: [
+                    ElevatedButton(
+                      onPressed: _login, 
+                      child: const Text("ENTRAR"),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PageRegistro()),
+                        );
+                      },
+                      child: const Text(
+                        "¿No tienes cuenta? Regístrate aquí",
+                        style: TextStyle(
+                          color: AgriPalette.greenMain,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),                
             if (_error.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(

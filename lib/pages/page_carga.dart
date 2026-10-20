@@ -1,3 +1,4 @@
+//page_carga.dart
 import 'dart:convert';
 
 import 'package:agriapp/services/sync_service.dart';
@@ -22,7 +23,8 @@ import '../models/record_albaran.dart';
 import '../services/db_service.dart'; // <--- ASEGÚRATE DE QUE ESTÉ ESTE
 
 // Destino
-import 'page_usuario.dart'; // Tu DashboardPage (UsuarioPage)
+//import 'page_usuario.dart'; // Tu DashboardPage (UsuarioPage)
+import 'page_dashboard.dart';
 import 'page_login.dart';
 
 class DashboardCarga extends StatefulWidget {
@@ -35,6 +37,31 @@ class DashboardCarga extends StatefulWidget {
 class _DashboardCargaState extends State<DashboardCarga> {
   final ApiService _apiService = ApiService();
   String _mensajeStatus = "Iniciando sesión...";
+
+bool _isTokenExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      String payload = parts[1];
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '='; break;
+      }
+      final String decoded = utf8.decode(base64Url.decode(payload));
+      final Map<String, dynamic> map = jsonDecode(decoded);
+
+      if (map.containsKey('exp')) {
+        final int exp = map['exp'];
+        final DateTime expDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        // Margen de 10 segundos antes de la caducidad
+        return DateTime.now().isAfter(expDate.subtract(const Duration(seconds: 10)));
+      }
+      return false;
+    } catch (_) {
+      return true; // Si falla el formateo, lo consideramos caducado
+    }
+  }
 
   @override
   void initState() {
@@ -239,172 +266,369 @@ Future<void> _iniciarApp() async {
   }
 */
 
-Future<void> _iniciarApp() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final String? token = prefs.getString('token');
+// Future<void> _iniciarApp() async {
+//   try {
+//     final prefs = await SharedPreferences.getInstance();
+//     final String? token = prefs.getString('token');
 
-    if (token == null || token.isEmpty) {
-      _irAlLogin();
-      return;
-    }
+//     if (token == null || token.isEmpty) {
+//       _irAlLogin();
+//       return;
+//     }
 
-    // --- 1. DECLARAMOS LAS VARIABLES AL PRINCIPIO ---
-    Usuario? usuario;
-    List<finca> fincas = [];
-    List<Almacen> almacenes = [];
-    List<Producto> productos = [];
-    List<Tipogasto> tiposGasto = [];
-    List<Tipodeprecio> tiposPrecio = [];
-    List<Tipooperacion> operaciones = [];
-    List<Trabajador> trabajadores = [];
-    List<Albaran> albaranes = [];
+//     // --- 1. DECLARAMOS LAS VARIABLES AL PRINCIPIO ---
+//     Usuario? usuario;
+//     List<finca> fincas = [];
+//     List<Almacen> almacenes = [];
+//     List<Producto> productos = [];
+//     List<Tipogasto> tiposGasto = [];
+//     List<Tipodeprecio> tiposPrecio = [];
+//     List<Tipooperacion> operaciones = [];
+//     List<Trabajador> trabajadores = [];
+//     List<Albaran> albaranes = [];
 
-    // --- 2. CARGAR PERFIL ---
-    final String? userJson = prefs.getString('usuario_json');
-    if (userJson != null) {
-      setState(() => _mensajeStatus = "Recuperando sesión local...");
-      usuario = Usuario.fromJson(jsonDecode(userJson));
-    } else {
-      setState(() => _mensajeStatus = "Cargando perfil desde servidor...");
-      final response = await _apiService.fetchParticular('perfil');
-      // final Map<String, dynamic> userData = (response is List) ? response.first : response;
-      final Map<String, dynamic> userData = response.first;
-      usuario = Usuario.fromJson(userData);
-      await prefs.setString('usuario_json', jsonEncode(userData));
-    }
+//     // --- 2. CARGAR PERFIL ---
+//     final String? userJson = prefs.getString('usuario_json');
+//     if (userJson != null) {
+//       setState(() => _mensajeStatus = "Recuperando sesión local...");
+//       usuario = Usuario.fromJson(jsonDecode(userJson));
+//     } else {
+//       setState(() => _mensajeStatus = "Cargando perfil desde servidor...");
+//       final response = await _apiService.fetchParticular('perfil');
+//       // final Map<String, dynamic> userData = (response is List) ? response.first : response;
+//       final Map<String, dynamic> userData = response.first;
+//       usuario = Usuario.fromJson(userData);
+//       await prefs.setString('usuario_json', jsonEncode(userData));
+//     }
 
-    // --- 3. CARGA MASIVA CON FALLBACK OFFLINE ---
+//     // --- 3. CARGA MASIVA CON FALLBACK OFFLINE ---
     
-    // FINCAS
-    setState(() => _mensajeStatus = "Sincronizando fincas...");
-    try {
-      fincas = (await _apiService.fetchListV('vfincas'))
-          .map((json) => finca.fromJson(json)).toList();
-      await DBService.instance.saveToCache('vfincas', fincas.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final local = await DBService.instance.getAllFromLocal('vfincas');
-      fincas = local.map((json) => finca.fromJson(json)).toList();
-    }
+//     // FINCAS
+//     setState(() => _mensajeStatus = "Sincronizando fincas...");
+//     try {
+//       fincas = (await _apiService.fetchListV('vfincas'))
+//           .map((json) => finca.fromJson(json)).toList();
+//       await DBService.instance.saveToCache('vfincas', fincas.map((e) => e.toJson()).toList());
+//     } catch (e) {
+//       if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//       final local = await DBService.instance.getAllFromLocal('vfincas');
+//       fincas = local.map((json) => finca.fromJson(json)).toList();
+//     }
 
-    // ALMACENES
-    setState(() => _mensajeStatus = "Cargando almacenes...");
-    try {
-      almacenes = (await _apiService.fetchList('tblalmacen'))
-          .map((json) => Almacen.fromJson(json)).toList();
-      await DBService.instance.saveToCache('tblalmacen', almacenes.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final local = await DBService.instance.getAllFromLocal('tblalmacen');
-      almacenes = local.map((json) => Almacen.fromJson(json)).toList();
-    }
+//     // ALMACENES
+//     setState(() => _mensajeStatus = "Cargando almacenes...");
+//     try {
+//       almacenes = (await _apiService.fetchList('tblalmacen'))
+//           .map((json) => Almacen.fromJson(json)).toList();
+//       await DBService.instance.saveToCache('tblalmacen', almacenes.map((e) => e.toJson()).toList());
+//     } catch (e) {
+//       if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//       final local = await DBService.instance.getAllFromLocal('tblalmacen');
+//       almacenes = local.map((json) => Almacen.fromJson(json)).toList();
+//     }
 
-    // PRODUCTOS
+//     // PRODUCTOS
+//       setState(() => _mensajeStatus = "Cargando productos...");
+//       try {
+//         // 1. CAMBIO CLAVE: Usamos fetchList apuntando a 'tblproducto' y isComun: true
+//         // Esto hace exactamente la misma petición que tu cURL exitoso
+//         productos = (await _apiService.fetchList('tblproducto', isComun: true))
+//             .map((json) => Producto.fromJson(json)).toList();
+
+//         print("Productos cargados desde API: ${productos.length}");
+//         print("Productos: ${productos.map((p) => p.kproducto).toList()}");
+            
+//         // 2. Guardamos en la caché local con la misma etiqueta
+//         await DBService.instance.saveToCache('tblproducto', productos.map((e) => e.toJson()).toList());
+//       } catch (e) {
+//         if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//         // 3. Fallback offline leyendo la misma etiqueta
+//         final local = await DBService.instance.getAllFromLocal('tblproducto');
+//         productos = local.map((json) => Producto.fromJson(json)).toList();
+//       }
+//     print("Productos cargados desde API: ${productos.length}");
+//     print("Productos: ${productos.map((p) => p.kproducto).toList()}");
+
+//     // MAESTROS (TIPOS GASTO, PRECIO, OPERACION)
+//     // Nota: Para ahorrar código, puedes hacerlos individuales o en bloque
+//     setState(() => _mensajeStatus = "Configurando maestros...");
+//     try {
+//       tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
+//           .map((json) => Tipogasto.fromJson(json)).toList();
+//       tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
+//           .map((json) => Tipodeprecio.fromJson(json)).toList();
+//       operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
+//           .map((json) => Tipooperacion.fromJson(json)).toList();
+      
+//       // Guardar en caché
+//       await DBService.instance.saveToCache('tbltipogasto', tiposGasto.map((e) => e.toJson()).toList());
+//       await DBService.instance.saveToCache('tbltipodeprecio', tiposPrecio.map((e) => e.toJson()).toList());
+//       await DBService.instance.saveToCache('tbltipooperacion', operaciones.map((e) => e.toJson()).toList());
+//     } catch (e) {
+//       if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//       final lGasto = await DBService.instance.getAllFromLocal('tbltipogasto');
+//       tiposGasto = lGasto.map((json) => Tipogasto.fromJson(json)).toList();
+//       final lPrecio = await DBService.instance.getAllFromLocal('tbltipodeprecio');
+//       tiposPrecio = lPrecio.map((json) => Tipodeprecio.fromJson(json)).toList();
+//       final lOperacion = await DBService.instance.getAllFromLocal('tbltipooperacion');
+//       operaciones = lOperacion.map((json) => Tipooperacion.fromJson(json)).toList();
+//     }
+
+//     // TRABAJADORES
+//     setState(() => _mensajeStatus = "Cargando personal...");
+//     try {
+//       trabajadores = (await _apiService.fetchList('tbltrabajador'))
+//           .map((json) => Trabajador.fromJson(json)).toList();
+//       await DBService.instance.saveToCache('tbltrabajador', trabajadores.map((e) => e.toJson()).toList());
+//     } catch (e) {
+//       if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//       final local = await DBService.instance.getAllFromLocal('tbltrabajador');
+//       trabajadores = local.map((json) => Trabajador.fromJson(json)).toList();
+//     }
+
+//     // ALBARANES
+//     setState(() => _mensajeStatus = "Recuperando albaranes...");
+//     try {
+//       albaranes = (await _apiService.fetchParticular('albaranesv2'))
+//           .map((json) => Albaran.fromJson(json)).toList();
+//       await DBService.instance.saveToCache('albaranes', albaranes.map((e) => e.toJson()).toList());
+//     } catch (e) {
+//       if (e.toString().contains("401") || e.toString().contains("Expired")) rethrow; // <-- AÑADIR ESTA LÍNEA
+//       final local = await DBService.instance.getAllFromLocal('albaranes');
+//       albaranes = local.map((json) => Albaran.fromJson(json)).toList();
+//     }
+
+//   //iniciamos el proceso de sincronización automática en segundo plano (cada 3 segundos)
+//   SyncService.startAutoSync();
+
+//     if (!mounted) return;
+
+//     // --- 4. SALTO AL DASHBOARD ---
+//     // Navigator.pushReplacement(
+//     //   context,
+//     //   MaterialPageRoute(
+//     //     builder: (context) => UsuarioPage(
+//     //       usuario: usuario!, 
+//     //       fincas: fincas,
+//     //       tiposGasto: tiposGasto,
+//     //       almacen: almacenes,
+//     //       producto: productos,
+//     //       tipodeprecio: tiposPrecio,
+//     //       tipooperacion: operaciones,
+//     //       trabajador: trabajadores,
+//     //       albaranes: albaranes,
+//     //     ),
+//     //   ),
+//     // );
+// Navigator.pushReplacement(
+//       context,
+//       MaterialPageRoute(
+//         builder: (context) => DashboardPage( // <-- AHORA NAVEGA AL DASHBOARD
+//           usuario: usuario!, 
+//           fincas: fincas,
+//           tiposGasto: tiposGasto,
+//           almacen: almacenes,
+//           producto: productos,
+//           tipodeprecio: tiposPrecio,
+//           tipooperacion: operaciones,
+//           trabajador: trabajadores,
+//           albaranes: albaranes,
+//         ),
+//       ),
+//     );
+
+// // En lib/pages/page_carga.dart, dentro de tu bloque try-catch:
+//   } catch (e) {
+//     print("Error crítico en carga: $e");
+    
+//     // Si el error es de autenticación, borramos todo y al login
+//     if (e.toString().contains("401") || e.toString().contains("Expired")) {
+//       final prefs = await SharedPreferences.getInstance();
+//       await prefs.remove('token');
+//       await prefs.remove('usuario_json');
+//       _irAlLogin(); 
+//     } else {
+//       // Si es otro tipo de error (red), intentamos cargar de local pero con aviso
+//       _irAlLogin(); // Recomendación: Si no hay red, mejor ir a Login o mostrar error
+//     }
+//   }
+// }
+
+Future<void> _iniciarApp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('token');
+
+      // 1. VERIFICACIÓN INMEDIATA DEL TOKEN LOCAL Y SU EXPIRACIÓN
+      if (token == null || token.isEmpty || _isTokenExpired(token)) {
+        await prefs.remove('token');
+        await prefs.remove('usuario_json');
+        _irAlLogin();
+        return;
+      }
+
+      Usuario? usuario;
+      List<finca> fincas = [];
+      List<Almacen> almacenes = [];
+      List<Producto> productos = [];
+      List<Tipogasto> tiposGasto = [];
+      List<Tipodeprecio> tiposPrecio = [];
+      List<Tipooperacion> operaciones = [];
+      List<Trabajador> trabajadores = [];
+      List<Albaran> albaranes = [];
+
+      // 2. CARGAR Y VALIDAR PERFIL EN SERVIDOR
+      try {
+        setState(() => _mensajeStatus = "Validando sesión...");
+        final dynamic response = await _apiService.fetchParticular('perfil');
+
+        if (response == null) {
+          throw Exception("401 Expired token");
+        }
+
+        Map<String, dynamic> userData;
+        if (response is List) {
+          if (response.isEmpty) {
+            throw Exception("401 Expired token");
+          }
+          userData = Map<String, dynamic>.from(response.first as Map);
+        } else if (response is Map) {
+          if (response.containsKey('error')) {
+            throw Exception("401 Expired token");
+          }
+          userData = Map<String, dynamic>.from(response);
+        } else {
+          throw Exception("401 Expired token");
+        }
+
+        usuario = Usuario.fromJson(userData);
+        await prefs.setString('usuario_json', jsonEncode(userData));
+      } catch (e) {
+        // Si el token expiró o dio error 401 en el servidor
+        if (e.toString().contains("401") || e.toString().contains("Expired")) {
+          await prefs.remove('token');
+          await prefs.remove('usuario_json');
+          _irAlLogin();
+          return;
+        }
+
+        // Si es un error de red/cobertura, usamos la sesión en caché local
+        final String? userJson = prefs.getString('usuario_json');
+        if (userJson != null) {
+          usuario = Usuario.fromJson(jsonDecode(userJson));
+        } else {
+          _irAlLogin();
+          return;
+        }
+      }
+
+      // 3. CARGA MASIVA CON FALLBACK OFFLINE
+      // FINCAS
+      setState(() => _mensajeStatus = "Sincronizando fincas...");
+      try {
+        fincas = (await _apiService.fetchListV('vfincas'))
+            .map((json) => finca.fromJson(json)).toList();
+        await DBService.instance.saveToCache('vfincas', fincas.map((e) => e.toJson()).toList());
+      } catch (_) {
+        final local = await DBService.instance.getAllFromLocal('vfincas');
+        fincas = local.map((json) => finca.fromJson(json)).toList();
+      }
+
+      // ALMACENES
+      setState(() => _mensajeStatus = "Cargando almacenes...");
+      try {
+        almacenes = (await _apiService.fetchList('tblalmacen'))
+            .map((json) => Almacen.fromJson(json)).toList();
+        await DBService.instance.saveToCache('tblalmacen', almacenes.map((e) => e.toJson()).toList());
+      } catch (_) {
+        final local = await DBService.instance.getAllFromLocal('tblalmacen');
+        almacenes = local.map((json) => Almacen.fromJson(json)).toList();
+      }
+
+      // PRODUCTOS
       setState(() => _mensajeStatus = "Cargando productos...");
       try {
-        // 1. CAMBIO CLAVE: Usamos fetchList apuntando a 'tblproducto' y isComun: true
-        // Esto hace exactamente la misma petición que tu cURL exitoso
         productos = (await _apiService.fetchList('tblproducto', isComun: true))
             .map((json) => Producto.fromJson(json)).toList();
-
-        print("Productos cargados desde API: ${productos.length}");
-        print("Productos: ${productos.map((p) => p.kproducto).toList()}");
-            
-        // 2. Guardamos en la caché local con la misma etiqueta
         await DBService.instance.saveToCache('tblproducto', productos.map((e) => e.toJson()).toList());
-      } catch (e) {
-        // 3. Fallback offline leyendo la misma etiqueta
+      } catch (_) {
         final local = await DBService.instance.getAllFromLocal('tblproducto');
         productos = local.map((json) => Producto.fromJson(json)).toList();
       }
-    print("Productos cargados desde API: ${productos.length}");
-    print("Productos: ${productos.map((p) => p.kproducto).toList()}");
 
-    // MAESTROS (TIPOS GASTO, PRECIO, OPERACION)
-    // Nota: Para ahorrar código, puedes hacerlos individuales o en bloque
-    setState(() => _mensajeStatus = "Configurando maestros...");
-    try {
-      tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
-          .map((json) => Tipogasto.fromJson(json)).toList();
-      tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
-          .map((json) => Tipodeprecio.fromJson(json)).toList();
-      operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
-          .map((json) => Tipooperacion.fromJson(json)).toList();
-      
-      // Guardar en caché
-      await DBService.instance.saveToCache('tbltipogasto', tiposGasto.map((e) => e.toJson()).toList());
-      await DBService.instance.saveToCache('tbltipodeprecio', tiposPrecio.map((e) => e.toJson()).toList());
-      await DBService.instance.saveToCache('tbltipooperacion', operaciones.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final lGasto = await DBService.instance.getAllFromLocal('tbltipogasto');
-      tiposGasto = lGasto.map((json) => Tipogasto.fromJson(json)).toList();
-      final lPrecio = await DBService.instance.getAllFromLocal('tbltipodeprecio');
-      tiposPrecio = lPrecio.map((json) => Tipodeprecio.fromJson(json)).toList();
-      final lOperacion = await DBService.instance.getAllFromLocal('tbltipooperacion');
-      operaciones = lOperacion.map((json) => Tipooperacion.fromJson(json)).toList();
-    }
+      // MAESTROS
+      setState(() => _mensajeStatus = "Configurando maestros...");
+      try {
+        tiposGasto = (await _apiService.fetchList('tbltipogasto', isComun: true))
+            .map((json) => Tipogasto.fromJson(json)).toList();
+        tiposPrecio = (await _apiService.fetchList('tbltipodeprecio', isComun: true))
+            .map((json) => Tipodeprecio.fromJson(json)).toList();
+        operaciones = (await _apiService.fetchList('tbltipooperacion', isComun: true))
+            .map((json) => Tipooperacion.fromJson(json)).toList();
 
-    // TRABAJADORES
-    setState(() => _mensajeStatus = "Cargando personal...");
-    try {
-      trabajadores = (await _apiService.fetchList('tbltrabajador'))
-          .map((json) => Trabajador.fromJson(json)).toList();
-      await DBService.instance.saveToCache('tbltrabajador', trabajadores.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final local = await DBService.instance.getAllFromLocal('tbltrabajador');
-      trabajadores = local.map((json) => Trabajador.fromJson(json)).toList();
-    }
+        await DBService.instance.saveToCache('tbltipogasto', tiposGasto.map((e) => e.toJson()).toList());
+        await DBService.instance.saveToCache('tbltipodeprecio', tiposPrecio.map((e) => e.toJson()).toList());
+        await DBService.instance.saveToCache('tbltipooperacion', operaciones.map((e) => e.toJson()).toList());
+      } catch (_) {
+        final lGasto = await DBService.instance.getAllFromLocal('tbltipogasto');
+        tiposGasto = lGasto.map((json) => Tipogasto.fromJson(json)).toList();
+        final lPrecio = await DBService.instance.getAllFromLocal('tbltipodeprecio');
+        tiposPrecio = lPrecio.map((json) => Tipodeprecio.fromJson(json)).toList();
+        final lOperacion = await DBService.instance.getAllFromLocal('tbltipooperacion');
+        operaciones = lOperacion.map((json) => Tipooperacion.fromJson(json)).toList();
+      }
 
-    // ALBARANES
-    setState(() => _mensajeStatus = "Recuperando albaranes...");
-    try {
-      albaranes = (await _apiService.fetchParticular('albaranesv2'))
-          .map((json) => Albaran.fromJson(json)).toList();
-      await DBService.instance.saveToCache('albaranes', albaranes.map((e) => e.toJson()).toList());
-    } catch (e) {
-      final local = await DBService.instance.getAllFromLocal('albaranes');
-      albaranes = local.map((json) => Albaran.fromJson(json)).toList();
-    }
+      // TRABAJADORES
+      setState(() => _mensajeStatus = "Cargando personal...");
+      try {
+        trabajadores = (await _apiService.fetchList('tbltrabajador'))
+            .map((json) => Trabajador.fromJson(json)).toList();
+        await DBService.instance.saveToCache('tbltrabajador', trabajadores.map((e) => e.toJson()).toList());
+      } catch (_) {
+        final local = await DBService.instance.getAllFromLocal('tbltrabajador');
+        trabajadores = local.map((json) => Trabajador.fromJson(json)).toList();
+      }
 
-  //iniciamos el proceso de sincronización automática en segundo plano (cada 3 segundos)
-  SyncService.startAutoSync();
+      // ALBARANES
+      setState(() => _mensajeStatus = "Recuperando albaranes...");
+      try {
+        albaranes = (await _apiService.fetchParticular('albaranesv2'))
+            .map((json) => Albaran.fromJson(json)).toList();
+        await DBService.instance.saveToCache('albaranes', albaranes.map((e) => e.toJson()).toList());
+      } catch (_) {
+        final local = await DBService.instance.getAllFromLocal('albaranes');
+        albaranes = local.map((json) => Albaran.fromJson(json)).toList();
+      }
 
-    if (!mounted) return;
+      SyncService.startAutoSync();
 
-    // --- 4. SALTO AL DASHBOARD ---
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UsuarioPage(
-          usuario: usuario!, 
-          fincas: fincas,
-          tiposGasto: tiposGasto,
-          almacen: almacenes,
-          producto: productos,
-          tipodeprecio: tiposPrecio,
-          tipooperacion: operaciones,
-          trabajador: trabajadores,
-          albaranes: albaranes,
+      if (!mounted) return;
+
+      // 4. SALTO AL DASHBOARD
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DashboardPage(
+            usuario: usuario!,
+            fincas: fincas,
+            tiposGasto: tiposGasto,
+            almacen: almacenes,
+            producto: productos,
+            tipodeprecio: tiposPrecio,
+            tipooperacion: operaciones,
+            trabajador: trabajadores,
+            albaranes: albaranes,
+          ),
         ),
-      ),
-    );
-
-
-// En lib/pages/page_carga.dart, dentro de tu bloque try-catch:
-  } catch (e) {
-    print("Error crítico en carga: $e");
-    
-    // Si el error es de autenticación, borramos todo y al login
-    if (e.toString().contains("401") || e.toString().contains("Expired")) {
+      );
+    } catch (e) {
+      print("Error crítico en carga: $e");
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('token');
       await prefs.remove('usuario_json');
-      _irAlLogin(); 
-    } else {
-      // Si es otro tipo de error (red), intentamos cargar de local pero con aviso
-      _irAlLogin(); // Recomendación: Si no hay red, mejor ir a Login o mostrar error
+      _irAlLogin();
     }
   }
-}
   void _irAlLogin() {
     if (!mounted) return;
     Navigator.pushReplacement(

@@ -39,7 +39,8 @@ function jwtMiddleware($secret)
     return function (Request $request, RequestHandler $handler) use ($secret) {
         $path = $request->getUri()->getPath();
 
-        if ($path === '/api/login' || $path === '/' || $path === '/swagger.json' || $path === '/api/marcaje'|| $path === '/api/info') {
+        #if ($path === '/api/login' || $path === '/' || $path === '/swagger.json' || $path === '/api/marcaje'|| $path === '/api/info') {
+        if ($path === '/api/login' || $path === '/api/registro' || $path === '/api/info' || $path === '/api/marcaje' || $path === '/' || $path === '/swagger.json') {
             return $handler->handle($request);
         }
 
